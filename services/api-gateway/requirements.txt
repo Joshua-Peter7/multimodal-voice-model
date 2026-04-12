@@ -1,0 +1,13 @@
+# API Gateway Requirements
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+python-dotenv==1.0.0
+PyYAML==6.0.1
+python-jose==3.3.0  # JWT
+PyJWT==2.8.1
+passlib==1.7.4  # Password hashing
+httpx==0.25.1  # HTTP client for proxying
+redis==5.0.1
+aioredis==2.0.1
+slowapi==0.1.9  # Rate limiting
