@@ -1,40 +1,38 @@
-# Production Dependencies - Real-Time 6-Language Indian Translation System
-# Supports: Sonix ASR, Llama Translation, ElevenLabs TTS
+# ============================================================
+# requirements.txt
+# ============================================================
 
-# Core Framework
-fastapi==0.104.1
-uvicorn==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-multipart==0.0.6
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+httptools==0.6.4
+websockets==14.1
 
-# Environment & Configuration
-python-dotenv==1.0.0
-PyYAML==6.0.1
+# HTTP client (async)
+aiohttp==3.11.10
 
-# HTTP Client
-requests==2.31.0
-httpx==0.25.0
+# Config
+pyyaml==6.0.2
+python-dotenv==1.0.1
 
-# ASR Providers
-deepgram-sdk>=4.0.0
-openai>=1.3.0
-google-cloud-speech>=2.21.0
+# Redis (async)
+redis[hiredis]==5.2.1
 
-# Translation Providers (choose one or install all)
-anthropic>=0.7.0
-openai>=1.3.0
-google-generativeai>=0.3.0
-google-cloud-translate>=3.11.0
+# Audio processing
+webrtcvad==2.0.10
+numpy==2.2.0
+pyaudio==0.2.14         # Optional — only for local mic capture
 
-# TTS Providers
-elevenlabs>=0.2.0
-google-cloud-texttospeech>=2.14.0
+# Structured logging
+structlog==24.4.0
 
-# Real-Time Communication
-websockets>=12.0
-python-socketio>=5.10.0
+# Type stubs & utilities
+typing_extensions==4.12.2
 
-# Utilities
-aiofiles>=23.0.0
-typing-extensions>=4.8.0
+# Prometheus metrics (optional)
+prometheus-client==0.21.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1

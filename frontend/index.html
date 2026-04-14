@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real-Time Translation Broadcast</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #252836;
+      --border: #2e3248;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --danger: #ff4f4f;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --success: #22c55e;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 18px; font-weight: 700; }
+    header .subtitle { color: var(--muted); font-size: 13px; }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .badge-live { background: #ff4f4f22; color: var(--danger); border: 1px solid #ff4f4f44; }
+    .badge-ok   { background: #22c55e22; color: var(--success); border: 1px solid #22c55e44; }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 0;
+    }
+
+    /* ── Speaker Panel ── */
+    .speaker-panel {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .mic-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .mic-btn:hover { background: #5a52e0; }
+    .mic-btn:active { transform: scale(0.98); }
+    .mic-btn.recording { background: var(--danger); animation: pulse 1.5s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,79,79,0.4); }
+      50% { box-shadow: 0 0 0 12px rgba(255,79,79,0); }
+    }
+
+    .visualizer {
+      height: 60px;
+      background: var(--surface2);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 8px;
+    }
+
+    .bar {
+      width: 4px;
+      background: var(--accent);
+      border-radius: 2px;
+      min-height: 4px;
+      transition: height 0.05s ease;
+    }
+
+    .transcript-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 100px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .transcript-box .partial { color: var(--muted); font-style: italic; }
+    .transcript-box .final { color: var(--text); }
+
+    .latency-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .metric {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      flex: 1;
+      min-width: 100px;
+    }
+    .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric-value { font-size: 20px; font-weight: 700; color: var(--accent2); margin-top: 2px; }
+
+    /* ── Listener Panel ── */
+    .listener-panel {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    .lang-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .lang-tab {
+      padding: 8px 16px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .lang-tab:hover { border-color: var(--accent); color: var(--text); }
+    .lang-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    .channel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .channel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .channel-card.active { border-color: var(--accent2); }
+
+    .channel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .lang-name { font-weight: 600; font-size: 15px; }
+    .lang-code { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+    .listen-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+    .listen-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
+    .listen-btn.listening { background: var(--accent2); border-color: var(--accent2); color: #000; font-weight: 600; }
+
+    .translation-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      min-height: 44px;
+      padding: 10px;
+      background: var(--surface2);
+      border-radius: 8px;
+    }
+
+    .translation-text.partial { color: var(--muted); font-style: italic; }
+
+    audio { width: 100%; height: 32px; margin-top: 4px; }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+    }
+    .status-dot.active { background: var(--success); animation: blink 1s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .log-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--muted);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+      .speaker-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌐 Real-Time Translation Broadcast</h1>
+    <div class="subtitle">Soniox STT · Llama 8B · ElevenLabs TTS</div>
+  </div>
+  <span class="badge badge-ok" id="server-status">● Connecting…</span>
+</header>
+
+<main>
+  <!-- SPEAKER PANEL -->
+  <section class="speaker-panel">
+    <div>
+      <div class="panel-title">Speaker</div>
+      <p style="font-size:13px;color:var(--muted);margin-top:4px;">
+        Speak into your mic. Audio streams to all listener channels in real-time.
+      </p>
+    </div>
+
+    <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+      🎙 Start Broadcasting
+    </button>
+
+    <div class="visualizer" id="visualizer">
+      <div class="bar" id="bar-placeholder" style="height:4px;width:80%;background:var(--border);border-radius:2px;"></div>
+    </div>
+
+    <div>
+      <div class="panel-title">Live Transcript</div>
+      <div class="transcript-box" id="transcript">
+        <span style="color:var(--muted)">Transcript will appear here…</span>
+      </div>
+    </div>
+
+    <div class="latency-bar">
+      <div class="metric">
+        <div class="metric-label">Total Latency</div>
+        <div class="metric-value" id="m-total">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Utterances</div>
+        <div class="metric-value" id="m-utt">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Channels</div>
+        <div class="metric-value" id="m-ch">—</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-title">Log</div>
+      <div class="log-box" id="log-box"></div>
+    </div>
+  </section>
+
+  <!-- LISTENER PANEL -->
+  <section class="listener-panel">
+    <div class="panel-title">Language Channels</div>
+    <div class="channel-grid" id="channel-grid"></div>
+  </section>
+</main>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────
+const WS_BASE = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+const SPEAKER_WS_PATH = '/ws/speaker';
+const LISTENER_WS_PATH = '/ws/listener';
+const AUDIO_SAMPLE_RATE = 16000;
+
+// ── State ──────────────────────────────────────────────────────────
+let speakerWs = null;
+let mediaStream = null;
+let audioContext = null;
+let processor = null;
+let analyser = null;
+let animFrame = null;
+let recording = false;
+let utteranceCount = 0;
+const listenerWsMap = {};     // lang_code → WebSocket
+const bars = [];
+
+// ── Log helper ─────────────────────────────────────────────────────
+function addLog(msg) {
+  const box = document.getElementById('log-box');
+  const line = document.createElement('div');
+  line.textContent = `${new Date().toLocaleTimeString()} · ${msg}`;
+  box.prepend(line);
+  if (box.children.length > 40) box.lastChild.remove();
+}
+
+// ── Server health poll ─────────────────────────────────────────────
+async function pollHealth() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    const el = document.getElementById('server-status');
+    el.textContent = '● Online';
+    el.className = 'badge badge-ok';
+    document.getElementById('m-ch').textContent =
+      Object.values(d.channels || {}).reduce((a, b) => a + b, 0);
+  } catch {
+    document.getElementById('server-status').textContent = '● Offline';
+    document.getElementById('server-status').className = 'badge badge-live';
+  }
+}
+
+async function loadLanguages() {
+  try {
+    const r = await fetch('/languages');
+    const d = await r.json();
+    renderChannels(d.targets);
+  } catch (e) {
+    addLog('Failed to load languages');
+  }
+}
+
+function renderChannels(targets) {
+  const grid = document.getElementById('channel-grid');
+  grid.innerHTML = '';
+  targets.forEach(lang => {
+    const card = document.createElement('div');
+    card.className = 'channel-card';
+    card.id = `card-${lang.code}`;
+    card.innerHTML = `
+      <div class="channel-header">
+        <div>
+          <div class="lang-name">${lang.name}
+            <span class="status-dot" id="dot-${lang.code}"></span>
+          </div>
+          <div class="lang-code">${lang.code}</div>
+        </div>
+        <button class="listen-btn" id="btn-${lang.code}" onclick="toggleListen('${lang.code}')">
+          Listen
+        </button>
+      </div>
+      <div class="translation-text" id="trans-${lang.code}">—</div>
+      <audio id="audio-${lang.code}" controls preload="none"></audio>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ── Mic / Speaker ──────────────────────────────────────────────────
+async function toggleMic() {
+  if (recording) {
+    stopMic();
+  } else {
+    await startMic();
+  }
+}
+
+async function startMic() {
+  try {
+    addLog('🎙️  Requesting microphone access...');
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: AUDIO_SAMPLE_RATE, channelCount: 1, echoCancellation: true, noiseSuppression: false },
+    });
+    addLog('✅ Microphone access granted');
+  } catch (e) {
+    addLog(`❌ Mic permission denied: ${e.message}`);
+    return;
+  }
+
+  try {
+    audioContext = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+
+    // ScriptProcessor for raw PCM (wide support; replace with AudioWorklet for prod)
+    processor = audioContext.createScriptProcessor(1024, 1, 1);
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    addLog('✅ Audio context initialized');
+
+    // Setup audio processing BEFORE connecting WebSocket
+    let audioSendCount = 0;
+    processor.onaudioprocess = (e) => {
+      if (!recording || speakerWs?.readyState !== WebSocket.OPEN) return;
+      const float32 = e.inputBuffer.getChannelData(0);
+      const int16 = float32ToInt16(float32);
+      speakerWs.send(int16.buffer);
+      audioSendCount++;
+      if (audioSendCount === 1) {
+        addLog('📊 Audio streaming started');
+      } else if (audioSendCount % 100 === 0) {
+        addLog(`📊 Sent ${audioSendCount} audio chunks`);
+      }
+    };
+
+    // Connect speaker WebSocket
+    addLog('🔌 Connecting to backend...');
+    speakerWs = new WebSocket(`${WS_BASE}${SPEAKER_WS_PATH}`);
+    speakerWs.binaryType = 'arraybuffer';
+
+    speakerWs.onopen = () => {
+      addLog('✅ Speaker stream connected');
+      recording = true;
+      updateMicUI(true);
+      startVisualizer();
+    };
+
+    speakerWs.onerror = (evt) => {
+      addLog(`❌ WebSocket error: ${evt}`);
+    };
+
+    speakerWs.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'ping') speakerWs.send(JSON.stringify({ type: 'pong' }));
+        if (msg.type === 'session_end') {
+          addLog(`✅ Session ended. Utterances: ${msg.stats.utterances}, Avg latency: ${msg.stats.avg_latency_ms}ms`);
+        }
+      } catch {}
+    };
+
+    speakerWs.onclose = () => {
+      addLog('⏹️  Speaker stream disconnected');
+      stopMic();
+    };
+  } catch (e) {
+    addLog(`❌ Setup error: ${e.message}`);
+    mediaStream?.getTracks().forEach(t => t.stop());
+  }
+}
+
+function stopMic() {
+  recording = false;
+  updateMicUI(false);
+  if (animFrame) cancelAnimationFrame(animFrame);
+  processor?.disconnect();
+  analyser?.disconnect();
+  mediaStream?.getTracks().forEach(t => t.stop());
+  if (speakerWs?.readyState === WebSocket.OPEN) {
+    speakerWs.send(JSON.stringify({ type: 'end' }));
+    speakerWs.close();
+  }
+  speakerWs = null;
+  resetVisualizer();
+}
+
+function updateMicUI(isRecording) {
+  const btn = document.getElementById('mic-btn');
+  btn.textContent = isRecording ? '⏹ Stop Broadcasting' : '🎙 Start Broadcasting';
+  btn.className = isRecording ? 'mic-btn recording' : 'mic-btn';
+}
+
+function float32ToInt16(float32) {
+  const int16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16;
+}
+
+// ── Visualizer ─────────────────────────────────────────────────────
+function startVisualizer() {
+  const viz = document.getElementById('visualizer');
+  viz.innerHTML = '';
+  bars.length = 0;
+  for (let i = 0; i < 40; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = '4px';
+    viz.appendChild(bar);
+    bars.push(bar);
+  }
+
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function draw() {
+    animFrame = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(data);
+    bars.forEach((bar, i) => {
+      const idx = Math.floor(i * data.length / bars.length);
+      const h = Math.max(4, (data[idx] / 255) * 52);
+      bar.style.height = `${h}px`;
+    });
+  }
+  draw();
+}
+
+function resetVisualizer() {
+  const viz = document.getElementById('visualizer');
+  viz.innerHTML = '<div id="bar-placeholder" style="height:4px;width:80%;background:var(--border);border-radius:2px;"></div>';
+  bars.length = 0;
+}
+
+// ── Listeners ──────────────────────────────────────────────────────
+function toggleListen(langCode) {
+  if (listenerWsMap[langCode]) {
+    listenerWsMap[langCode].close();
+    delete listenerWsMap[langCode];
+    document.getElementById(`btn-${langCode}`).textContent = 'Listen';
+    document.getElementById(`btn-${langCode}`).classList.remove('listening');
+    document.getElementById(`dot-${langCode}`).classList.remove('active');
+    document.getElementById(`card-${langCode}`).classList.remove('active');
+  } else {
+    startListening(langCode);
+  }
+}
+
+function startListening(langCode) {
+  const ws = new WebSocket(`${WS_BASE}${LISTENER_WS_PATH}/${langCode}`);
+  ws.binaryType = 'arraybuffer';
+  listenerWsMap[langCode] = ws;
+
+  ws.onopen = () => {
+    addLog(`Listening: ${langCode}`);
+    document.getElementById(`btn-${langCode}`).textContent = '⏹ Stop';
+    document.getElementById(`btn-${langCode}`).classList.add('listening');
+    document.getElementById(`dot-${langCode}`).classList.add('active');
+    document.getElementById(`card-${langCode}`).classList.add('active');
+  };
+
+  ws.onmessage = async (evt) => {
+    let payload;
+    try {
+      const text = typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data);
+      payload = JSON.parse(text);
+    } catch { return; }
+
+    if (payload.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
+    if (!payload.translated_text) return;
+
+    // Update translation text
+    const transEl = document.getElementById(`trans-${langCode}`);
+    if (transEl) {
+      transEl.textContent = payload.translated_text;
+      transEl.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
+    }
+
+    // Update latency metric
+    if (payload.is_final) {
+      utteranceCount++;
+      document.getElementById('m-utt').textContent = utteranceCount;
+      document.getElementById('m-total').textContent = `${Math.round(payload.latency_ms)}ms`;
+    }
+
+    // Play audio if present
+    if (payload.audio_b64 && payload.is_final) {
+      const audioData = base64ToArrayBuffer(payload.audio_b64);
+      playAudioBytes(langCode, audioData, payload.audio_b64.includes('pcm') ? 'audio/pcm' : 'audio/mpeg');
+    }
+  };
+
+  ws.onclose = () => {
+    delete listenerWsMap[langCode];
+    document.getElementById(`btn-${langCode}`)?.classList.remove('listening');
+    document.getElementById(`dot-${langCode}`)?.classList.remove('active');
+    document.getElementById(`card-${langCode}`)?.classList.remove('active');
+    addLog(`Channel ${langCode} closed`);
+  };
+}
+
+function base64ToArrayBuffer(b64) {
+  const binary = atob(b64);
+  const buf = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+  return buf;
+}
+
+function playAudioBytes(langCode, arrayBuffer, mimeType) {
+  const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/mpeg' });
+  const url = URL.createObjectURL(blob);
+  const audioEl = document.getElementById(`audio-${langCode}`);
+  if (audioEl) {
+    audioEl.src = url;
+    audioEl.play().catch(() => {});
+  }
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────
+pollHealth();
+loadLanguages();
+setInterval(pollHealth, 5000);
+</script>
+</body>
+</html>
