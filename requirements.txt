@@ -1,5 +1,5 @@
 # ============================================================
-# requirements.txt
+# requirements.txt — Ultra-Low Latency Voice Translation System
 # ============================================================
 
 # Web framework
@@ -8,7 +8,7 @@ uvicorn[standard]==0.32.1
 httptools==0.6.4
 websockets==14.1
 
-# HTTP client (async)
+# HTTP client (async) — used for Groq + ElevenLabs API calls
 aiohttp==3.11.10
 
 # Config

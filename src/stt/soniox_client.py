@@ -18,7 +18,7 @@ from src.logger import get_logger, log_latency
 
 log = get_logger(__name__)
 
-SONIOX_WS_URL = "wss://api.soniox.com/transcribe-websocket"
+SONIOX_WS_URL = "wss://stt-rt.soniox.com/transcribe-websocket"
 
 
 @dataclass
@@ -59,23 +59,46 @@ class SonioxSTTClient:
     async def _connect(self) -> aiohttp.ClientWebSocketResponse:
         """Open a new WebSocket connection to Soniox."""
         session = await self._ensure_session()
-        ws = await session.ws_connect(
-            SONIOX_WS_URL,
-            heartbeat=20,
-            max_msg_size=0,
-        )
-        # Send config frame
-        config = {
-            "api_key": self._cfg.api_key,
-            "model": self._cfg.model,
-            "sample_rate": self._cfg.sample_rate,
-            "num_audio_channels": self._cfg.num_audio_channels,
-            "include_nonfinal": self._cfg.include_nonfinal,
-            "max_alternatives": self._cfg.max_alternatives,
-        }
-        await ws.send_str(json.dumps(config))
-        log.info("soniox_connected", model=self._cfg.model)
-        return ws
+        try:
+            log.info("soniox_connecting", api_key_set=bool(self._cfg.api_key))
+            ws = await session.ws_connect(
+                SONIOX_WS_URL,
+                heartbeat=20,
+                max_msg_size=0,
+            )
+            log.info("soniox_ws_connected", ws_closed=ws.closed)
+            
+            # Send config frame - Soniox expects a specific JSON format
+            config = {
+                "api_key": self._cfg.api_key,
+                "model": self._cfg.model,
+                "audio_format": "pcm_s16le",
+                "sample_rate": self._cfg.sample_rate,
+                "num_channels": self._cfg.num_audio_channels,
+                "include_nonfinal": self._cfg.include_nonfinal,
+                "enable_endpoint_detection": True,
+            }
+            config_json = json.dumps(config)
+            log.info("soniox_config_json", json_str=config_json[:200])
+            await ws.send_str(config_json)
+            log.info("soniox_config_sent", config_keys=list(config.keys()), model=self._cfg.model)
+            
+            # Try to read acknowledgment or any immediate response
+            try:
+                # Wait briefly to see if Soniox closes or sends an ack
+                await asyncio.sleep(0.1)
+                # Check if connection is still open
+                if ws.closed:
+                    log.error("soniox_closed_after_config", reason="WebSocket closed after config send")
+                else:
+                    log.info("soniox_connection_still_open")
+            except:
+                pass
+            
+            return ws
+        except Exception as e:
+            log.error("soniox_connect_error", error=str(e), error_type=type(e).__name__)
+            raise
 
     async def transcribe_stream(
         self,
@@ -102,62 +125,98 @@ class SonioxSTTClient:
     ) -> AsyncGenerator[Transcript, None]:
         ws = await self._connect()
         send_start = time.perf_counter()
+        chunks_sent = 0
 
         async def _send_audio() -> None:
-            async for chunk in audio_chunks:
-                await ws.send_bytes(chunk)
-            # Signal end of stream
-            await ws.send_str(json.dumps({"eof": True}))
+            nonlocal chunks_sent
+            try:
+                async for chunk in audio_chunks:
+                    await ws.send_bytes(chunk)
+                    chunks_sent += 1
+                    if chunks_sent == 1:
+                        log.info("soniox_first_chunk_sent", bytes=len(chunk))
+                    elif chunks_sent % 100 == 0:
+                        log.info("soniox_audio_progress", chunks=chunks_sent)
+                # Signal end of stream
+                log.info("soniox_sending_eof", total_chunks=chunks_sent)
+                await ws.send_str("")
+            except Exception as e:
+                log.error("soniox_send_error", error=str(e))
+                raise
 
         send_task = asyncio.create_task(_send_audio())
 
+        msg_count = 0
+        final_tokens = []
         try:
+            log.info("soniox_waiting_for_messages", ws_closed=ws.closed)
             async for msg in ws:
+                msg_count += 1
+                
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    data = json.loads(msg.data)
+                    try:
+                        data = json.loads(msg.data)
+                    except json.JSONDecodeError as e:
+                        log.error("soniox_json_parse_error", error=str(e), raw=str(msg.data)[:200])
+                        continue
 
-                    if "error" in data:
-                        log.error("soniox_api_error", error=data["error"])
+                    if data.get("error_code") is not None:
+                        log.error("soniox_api_error", error_code=data.get("error_code"), error=data.get("error_message"))
                         break
 
-                    if "final_proc_time_ms" in data or "words" in data:
-                        words = data.get("words", [])
-                        final_words = [w for w in words if w.get("is_final", True)]
-                        nonfinal_words = [w for w in words if not w.get("is_final", True)]
+                    non_final_tokens = []
+                    for token in data.get("tokens", []):
+                        if token.get("text"):
+                            if token.get("is_final"):
+                                final_tokens.append(token)
+                            else:
+                                non_final_tokens.append(token)
 
-                        all_text = " ".join(w.get("text", "") for w in words).strip()
-                        is_final = len(nonfinal_words) == 0 and len(final_words) > 0
-
-                        if not all_text:
-                            continue
-
+                    if final_tokens or non_final_tokens:
+                        # Reconstruct the current text
+                        all_text = "".join(t["text"] for t in final_tokens + non_final_tokens).strip()
+                        
                         latency = (time.perf_counter() - send_start) * 1000
+                        # Determine if this emit should be considered absolutely final
+                        is_final = bool(data.get("finished", False))
+                        
+                        # But wait, orchestrator treats is_final=True as "phrase complete", so we can also check endpointing
+                        # Soniox doesn't explicitly flag utterance endpoints except by finishing or by logic in the tokens.
+                        # For now, we'll stream identically to the mock.
+                        
                         transcript = Transcript(
                             text=all_text,
                             is_final=is_final,
-                            confidence=data.get("confidence", 1.0),
+                            confidence=1.0,
                             latency_ms=latency,
-                            words=words,
+                            words=final_tokens + non_final_tokens,
                         )
-
-                        if cfg.logging.log_transcripts:
-                            log.info(
-                                "transcript",
-                                text=all_text,
-                                is_final=is_final,
-                                latency_ms=round(latency, 1),
-                            )
 
                         yield transcript
 
                     if data.get("finished"):
+                        log.info("soniox_stream_finished")
+                        # Emitting a final empty text transcript can signal true pipeline flush if needed
                         break
 
-                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                    log.warning("soniox_ws_closed")
+                elif msg.type == aiohttp.WSMsgType.CLOSE:
+                    log.warning("soniox_ws_close_received", code=msg.data, message=msg.extra)
                     break
+                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    log.warning("soniox_ws_closed", msg_type=str(msg.type), msg=str(msg))
+                    break
+                elif msg.type == aiohttp.WSMsgType.BINARY:
+                    log.debug("soniox_binary_message", size=len(msg.data))
+        except asyncio.CancelledError:
+            log.info("soniox_cancelled")
+        except Exception as e:
+            log.error("soniox_receive_error", error=str(e), error_type=type(e).__name__)
         finally:
-            send_task.cancel()
+            log.info("soniox_session_end", messages_received=msg_count, chunks_sent=chunks_sent)
+            try:
+                send_task.cancel()
+            except:
+                pass
             await ws.close()
 
     async def close(self) -> None:

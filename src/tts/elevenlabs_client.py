@@ -82,7 +82,7 @@ class ElevenLabsTTSClient:
 
     async def stream_one_ws(
         self,
-        text: str,
+        text_or_stream: str | AsyncGenerator[str, None],
         language: LanguageConfig,
         on_chunk: Optional[Callable[[TTSChunk], None]] = None,
     ) -> AsyncGenerator[TTSChunk, None]:
@@ -122,17 +122,26 @@ class ElevenLabsTTSClient:
                     }
                     await ws.send_str(json.dumps(bos_msg))
 
-                    # Send the actual text
-                    text_msg = {
-                        "text": text,
-                        "try_trigger_generation": True,
-                        "flush": True,
-                    }
-                    await ws.send_str(json.dumps(text_msg))
-
-                    # Send EOS (end of stream) to trigger final generation
-                    eos_msg = {"text": ""}
-                    await ws.send_str(json.dumps(eos_msg))
+                    # Fire off a task to stream tokens to ElevenLabs WebSocket
+                    async def tx_task():
+                        try:
+                            if isinstance(text_or_stream, str):
+                                text_msg = {"text": text_or_stream, "try_trigger_generation": True, "flush": True}
+                                await ws.send_str(json.dumps(text_msg))
+                            else:
+                                async for token in text_or_stream:
+                                    if not token: continue
+                                    await ws.send_str(json.dumps({
+                                        "text": token,
+                                        "try_trigger_generation": True
+                                    }))
+                        finally:
+                            # Send EOS (end of stream) to trigger final generation
+                            eos_msg = {"text": ""}
+                            await ws.send_str(json.dumps(eos_msg))
+                            
+                    tx_future = asyncio.create_task(tx_task())
+                    tx_error = None
 
                     # Receive audio chunks
                     async for msg in ws:
@@ -171,6 +180,12 @@ class ElevenLabsTTSClient:
                         elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                             break
 
+                    # Ensure tx_task completes and propagate any errors
+                    try:
+                        await tx_future
+                    except Exception as tx_exc:
+                        log.warning("tts_ws_tx_error", lang=language.code, error=str(tx_exc))
+
                 # Yield final marker
                 final_latency = (time.perf_counter() - start) * 1000
                 yield TTSChunk(
@@ -196,9 +211,16 @@ class ElevenLabsTTSClient:
                     error=str(exc),
                     fallback="http",
                 )
-                # Fall back to HTTP streaming
-                async for chunk in self.stream_one_http(text, language):
-                    yield chunk
+                # Fall back to HTTP streaming (only if we have a plain string)
+                if isinstance(text_or_stream, str):
+                    async for chunk in self.stream_one_http(text_or_stream, language):
+                        yield chunk
+                else:
+                    log.error(
+                        "tts_ws_fallback_impossible",
+                        lang=language.code,
+                        reason="Cannot replay async generator for HTTP fallback",
+                    )
 
     # ── HTTP Streaming (Fallback) ────────────────────────────────
 

@@ -202,11 +202,31 @@ async def speaker_ws(websocket: WebSocket):
 
     async def _pipeline_task():
         try:
-            await pipeline.run(_ws_audio_source())
+            log.info("pipeline_task_starting", session=session_id)
+            async for transcript in pipeline.run(_ws_audio_source()):
+                log.info("transcript_received", session=session_id, text=transcript.text[:50])
+                try:
+                    await websocket.send_text(json.dumps({
+                        "type": "transcript",
+                        "text": transcript.text,
+                        "is_final": transcript.is_final
+                    }))
+                except Exception as e:
+                    log.error("transcript_send_error", error=str(e))
+            log.info("pipeline_task_completed", session=session_id)
         except asyncio.CancelledError:
             log.info("pipeline_task_cancelled", session=session_id)
         except Exception as exc:
-            log.error("pipeline_error", session=session_id, error=str(exc), type=type(exc).__name__)
+            error_msg = f"{type(exc).__name__}: {str(exc)}"
+            log.error("pipeline_error", session=session_id, error=error_msg, traceback=str(exc))
+            # Send error to frontend
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"Pipeline error: {error_msg}"
+                }))
+            except:
+                pass
 
     pipe_task = asyncio.create_task(_pipeline_task())
 

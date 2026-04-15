@@ -12,7 +12,7 @@ import asyncio
 import json
 import re
 import time
-from typing import Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 
 import aiohttp
 
@@ -268,9 +268,51 @@ class LLMTranslator:
 
         return TranslationResult({}, source_text, 0.0, self._cfg.model_id)
 
+    async def translate_stream_language(
+        self,
+        source_text: str,
+        target_lang: LanguageConfig,
+    ) -> AsyncGenerator[str, None]:
+        """Stream translation tokens for a single language."""
+        user_prompt = (
+            f"Translate the following into {target_lang.name} ({target_lang.code}).\n"
+            f"Return ONLY the translated text, no markdown, no quotes, no explanation.\n\n"
+            f"Text: \"{source_text}\""
+        )
+        
+        payload = {
+            "model": self._cfg.model_id,
+            "messages": [
+                {"role": "system", "content": "You are a fast precision translator. Reply strictly with the translated text."},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_tokens": self._cfg.max_tokens,
+            "temperature": self._cfg.temperature,
+            "stream": True,
+        }
+
+        session = await self._ensure_session()
+        try:
+            async with session.post(self._url, json=payload) as resp:
+                resp.raise_for_status()
+                async for chunk_bytes in resp.content:
+                    if not chunk_bytes: continue
+                    chunk_str = chunk_bytes.decode('utf-8')
+                    # Groq SSE format: data: {"id":..., "choices":[{"delta":{"content":"hola"}}]}
+                    for line in chunk_str.split('\n'):
+                        if line.startswith('data: ') and line.strip() != 'data: [DONE]':
+                            try:
+                                data = json.loads(line[6:])
+                                delta = data.get('choices', [{}])[0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    if content: 
+                                        yield content
+                            except json.JSONDecodeError:
+                                pass
+        except Exception as e:
+            log.error("groq_stream_error", language=target_lang.code, error=str(e))
+            
     async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()
-"""
-translation/llm_translator.py — Groq-powered ultra-fast one-to-many translator.
-"""

@@ -1,170 +1,123 @@
-# ============================================================
-# AI Multi-Channel Real-Time Speech Translation System
-# Master Configuration File — edit ALL settings here
-# ============================================================
-
-# ── API Credentials (use .env for secrets) ──────────────────
 apis:
-  soniox:
-    api_key: "${SONIOX_API_KEY}"
-    model: "en_v2_lowlatency"          # Use lowlatency model variant
-    sample_rate: 16000
-    num_audio_channels: 1
-    include_nonfinal: true             # Stream partial results for low latency
-    max_alternatives: 1
-
-  groq:
-    api_key: "${GROQ_API_KEY}"
-    base_url: "https://api.groq.com/openai/v1"
-    model_id: "llama-3.3-70b-versatile"  # Fastest large model on Groq
-    max_tokens: 512
-    temperature: 0.05                  # Near-deterministic for translation
-    timeout_seconds: 5                 # Groq is fast, short timeout
-
   elevenlabs:
-    api_key: "${ELEVENLABS_API_KEY}"
-    model_id: "eleven_turbo_v2_5"      # Lowest-latency ElevenLabs model
-    output_format: "pcm_16000"         # Raw PCM — lowest overhead
-    optimize_streaming_latency: 4      # 0-4, 4 = max optimization
-    stream_chunk_size: 512             # Smaller chunks for lower latency
-    use_websocket: true                # WebSocket streaming for lowest latency
-    ws_url: "wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input?model_id=eleven_turbo_v2_5&output_format=pcm_16000"
-
-# ── Source Language ─────────────────────────────────────────
-source:
-  language_code: "en"
-  language_name: "English"
-
-# ── Target Language Channels ────────────────────────────────
-# Add or remove languages here. voice_id from ElevenLabs dashboard.
-# stability: 0.0-1.0  (higher = more consistent, less expressive)
-# similarity_boost: 0.0-1.0
-languages:
-  - code: "hi"
-    name: "Hindi"
-    voice_id: "${EL_VOICE_HI}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: true
-
-  - code: "te"
-    name: "Telugu"
-    voice_id: "${EL_VOICE_TE}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: true
-
-  - code: "ta"
-    name: "Tamil"
-    voice_id: "${EL_VOICE_TA}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: true
-
-  - code: "es"
-    name: "Spanish"
-    voice_id: "${EL_VOICE_ES}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: true
-
-  - code: "fr"
-    name: "French"
-    voice_id: "${EL_VOICE_FR}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: false                     # Toggle languages on/off here
-
-  - code: "de"
-    name: "German"
-    voice_id: "${EL_VOICE_DE}"
-    stability: 0.5
-    similarity_boost: 0.75
-    enabled: false
-
-# ── Audio Settings ──────────────────────────────────────────
+    api_key: ${ELEVENLABS_API_KEY}
+    model_id: eleven_turbo_v2_5
+    optimize_streaming_latency: 4
+    output_format: pcm_16000
+    stream_chunk_size: 512
+    use_websocket: true
+    ws_url: wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input?model_id=eleven_turbo_v2_5&output_format=pcm_16000
+  groq:
+    api_key: ${GROQ_API_KEY}
+    base_url: https://api.groq.com/openai/v1
+    max_tokens: 512
+    model_id: llama-3.3-70b-versatile
+    temperature: 0.05
+    timeout_seconds: 5
+  soniox:
+    api_key: ${SONIOX_API_KEY}
+    include_nonfinal: true
+    max_alternatives: 1
+    model: stt-rt-v4
+    num_audio_channels: 1
+    sample_rate: 16000
 audio:
-  sample_rate: 16000                   # Hz — match Soniox requirement
-  channels: 1                          # Mono
   bit_depth: 16
-  chunk_duration_ms: 20                # 20ms chunks for ultra-low latency
-  bypass_vad: true                     # Bypass VAD, stream directly to STT
-  vad:
-    enabled: false                     # Disabled — Soniox handles endpointing
-    aggressiveness: 2                  # 0-3 (3 = most aggressive filtering)
-    silence_threshold_ms: 300          # Reduced for faster utterance detection
-    speech_threshold_ms: 100           # Reduced for faster trigger
-    energy_threshold: 0.005
+  bypass_vad: true
+  channels: 1
+  chunk_duration_ms: 20
   noise_suppression:
-    enabled: false                     # Disabled — reduces latency, Soniox handles noise
-    intensity: 0.5                     # 0.0-1.0
-
-# ── Pipeline Settings ────────────────────────────────────────
+    enabled: false
+    intensity: 0.5
+  sample_rate: 16000
+  vad:
+    aggressiveness: 2
+    enabled: false
+    energy_threshold: 0.005
+    silence_threshold_ms: 300
+    speech_threshold_ms: 100
+languages:
+- code: hi
+  enabled: true
+  name: Hindi
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_HI}
+- code: te
+  enabled: true
+  name: Telugu
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_TE}
+- code: ta
+  enabled: true
+  name: Tamil
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_TA}
+- code: es
+  enabled: true
+  name: Spanish
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_ES}
+- code: fr
+  enabled: false
+  name: French
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_FR}
+- code: de
+  enabled: false
+  name: German
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_DE}
+logging:
+  format: json
+  level: INFO
+  log_latency: true
+  log_transcripts: true
+metrics:
+  collect_interval_seconds: 10
+  enabled: true
+  prometheus_port: 9090
+moderation:
+  blocked_words: []
+  enabled: true
+  moderate_translations: true
+  replacement_text: '***'
+  severity_threshold: 0.7
+  strategy: filter
 pipeline:
-  # Speculative translation: translate partial STT results before final
-  speculative_translation: true
-  # Min partial transcript length (chars) before triggering translation
-  partial_min_chars: 8
-  # How often to run speculative translation (ms)
-  speculative_interval_ms: 80
-  # Final transcript confirmation delay (ms)
   final_confirm_delay_ms: 10
-  # Max concurrent TTS generation tasks
   max_tts_concurrency: 12
-  # Max total end-to-end latency target (ms)
-  target_latency_ms: 60
-  # Retry config
+  parallel_lang_processing: true
+  partial_min_chars: 8
   retry_attempts: 1
   retry_delay_ms: 20
-  # Stream TTS audio chunks to listeners as they arrive
+  speculative_interval_ms: 80
+  speculative_translation: true
   stream_tts_chunks: true
-  # Overlap translation and TTS for parallel languages
-  parallel_lang_processing: true
-
-# ── Content Moderation ───────────────────────────────────────
-moderation:
-  enabled: true
-  # Strategy: "block" (drop message) | "filter" (replace words) | "flag" (pass + flag)
-  strategy: "filter"
-  replacement_text: "***"
-  # Custom blocked words (add your own)
-  blocked_words: []
-  # Severity threshold 0.0-1.0 (flag content above this score)
-  severity_threshold: 0.7
-  # Also moderate translated output
-  moderate_translations: true
-
-# ── WebSocket Server ─────────────────────────────────────────
+  target_latency_ms: 60
+redis:
+  channel_prefix: lang_channel
+  db: 0
+  host: ${REDIS_HOST}
+  max_connections: 20
+  password: ${REDIS_PASSWORD}
+  port: 6379
 server:
-  host: "0.0.0.0"
-  port: 8000
-  ws_path: "/ws"
-  ws_speaker_path: "/ws/speaker"       # Speaker sends audio here
-  ws_listener_path: "/ws/listener"     # Listeners subscribe to channels
   cors_origins:
-    - "*"                              # Restrict in production
+  - '*'
+  host: 0.0.0.0
   max_connections: 500
   ping_interval_seconds: 20
   ping_timeout_seconds: 10
-
-# ── Redis (Pub/Sub for channel distribution) ─────────────────
-redis:
-  host: "${REDIS_HOST}"
-  port: 6379
-  db: 0
-  password: "${REDIS_PASSWORD}"
-  channel_prefix: "lang_channel"
-  max_connections: 20
-
-# ── Logging ──────────────────────────────────────────────────
-logging:
-  level: "INFO"                        # DEBUG | INFO | WARNING | ERROR
-  format: "json"                       # "json" | "text"
-  log_latency: true                    # Log per-stage latency metrics
-  log_transcripts: false               # Set true for debugging only
-
-# ── Metrics ──────────────────────────────────────────────────
-metrics:
-  enabled: true
-  prometheus_port: 9090
-  collect_interval_seconds: 10
+  port: 8000
+  ws_listener_path: /ws/listener
+  ws_path: /ws
+  ws_speaker_path: /ws/speaker
+source:
+  language_code: en
+  language_name: English
