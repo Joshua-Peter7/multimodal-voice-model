@@ -259,6 +259,23 @@ class TranslationPipeline:
             for lang in cfg.enabled_languages:
                 translations[lang.code] = ""
 
+        # Step 1.5: Broadcast translations immediately (UI update)
+        latency_so_far = (time.perf_counter() - pipeline_start) * 1000
+        broadcast_tasks = []
+        for lang_code, trans_text in translations.items():
+            if trans_text:
+                broadcast_tasks.append(
+                    self._channels.publish_translation_update(
+                        lang_code=lang_code,
+                        source_text=text,
+                        translated_text=trans_text,
+                        is_final=is_final,
+                        pipeline_latency_ms=latency_so_far
+                    )
+                )
+        if broadcast_tasks:
+            await asyncio.gather(*broadcast_tasks)
+
         # Step 2: Stream TTS for each language in parallel
         async def _process_language(lang):
             try:

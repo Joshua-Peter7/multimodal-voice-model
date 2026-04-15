@@ -1043,6 +1043,19 @@ function start_listening(lang_code) {
       return;
     }
 
+    // Immediate translation update
+    if (payload.type === 'translation_update') {
+      const trans_el = document.getElementById(`trans-${lang_code}`);
+      if (trans_el) {
+        trans_el.textContent = payload.translated_text;
+        trans_el.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
+      }
+      if (payload.latency_ms) {
+        document.getElementById(`lat-val-${lang_code}`).textContent = `${Math.round(payload.latency_ms)}ms`;
+      }
+      return;
+    }
+
     // Streaming audio chunk
     if (payload.type === 'audio_chunk' && payload.audio_b64) {
       document.getElementById(`card-${lang_code}`)?.classList.add('streaming');

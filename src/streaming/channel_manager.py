@@ -172,6 +172,43 @@ class ChannelManager:
             except Exception:
                 pass
 
+    async def publish_translation_update(
+        self,
+        lang_code: str,
+        source_text: str,
+        translated_text: str,
+        is_final: bool,
+        pipeline_latency_ms: float,
+    ) -> None:
+        """
+        Broadcast just the text translation (no audio).
+        Allows UI to update instantly after LLM phase.
+        """
+        payload = StreamChunkPayload(
+            type="translation_update",
+            lang_code=lang_code,
+            source_text=source_text,
+            translated_text=translated_text,
+            audio_b64="",
+            chunk_index=-1,
+            is_final=is_final,
+            latency_ms=pipeline_latency_ms,
+            moderation_flag=False,
+            timestamp=time.time(),
+        )
+        encoded = json.dumps(asdict(payload)).encode()
+
+        ws_set = self._subscribers.get(lang_code, set())
+        if ws_set:
+            tasks = [self._safe_send(ws, encoded, lang_code) for ws in list(ws_set)]
+            await asyncio.gather(*tasks)
+
+        if self._redis_enabled and self._redis:
+            try:
+                await self._redis.publish(f"{self._prefix}:{lang_code}", encoded)
+            except Exception:
+                pass
+
     async def publish_stream_complete(
         self,
         lang_code: str,
