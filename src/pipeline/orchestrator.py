@@ -64,6 +64,7 @@ class UtteranceContext:
     last_translated: Dict[str, str] = field(default_factory=dict)
     speculative_task: Optional[asyncio.Task] = None
     final_processed: bool = False
+    source_lang: Optional[str] = None
 
 
 class TranslationPipeline:
@@ -94,7 +95,11 @@ class TranslationPipeline:
 
     # ── Public API ──────────────────────────────────────────────
 
-    async def run(self, audio_source: AsyncGenerator[bytes, None]) -> AsyncGenerator[Transcript, None]:
+    async def run(
+        self, 
+        audio_source: AsyncGenerator[bytes, None],
+        source_lang: Optional[str] = None
+    ) -> AsyncGenerator[Transcript, None]:
         """
         Main run loop — consumes streaming audio and drives the entire pipeline.
         Call this as a background task for each speaker session.
@@ -126,24 +131,27 @@ class TranslationPipeline:
 
         if cfg.audio.bypass_vad:
             # Stream directly to STT — Soniox handles endpointing
-            async for transcript in self._run_stt_direct(_queue_reader()):
+            async for transcript in self._run_stt_direct(_queue_reader(), source_lang):
                 yield transcript
         else:
             # Run VAD on the queue stream, then STT on VAD output
-            async for transcript in self._run_stt_with_vad(_queue_reader()):
+            async for transcript in self._run_stt_with_vad(_queue_reader(), source_lang):
                 yield transcript
 
         producer_task.cancel()
 
     async def _run_stt_direct(
-        self, audio_gen: AsyncGenerator[bytes, None]
+        self, 
+        audio_gen: AsyncGenerator[bytes, None],
+        source_lang: Optional[str] = None
     ) -> AsyncGenerator[Transcript, None]:
         """Stream audio directly to Soniox STT (bypass VAD for lowest latency)."""
         self._utterance_counter += 1
         ctx = UtteranceContext(utterance_id=f"utt-{self._utterance_counter}")
+        ctx.source_lang = source_lang
         self._active_context = ctx
 
-        async for transcript in self._stt.transcribe_stream(audio_gen):
+        async for transcript in self._stt.transcribe_stream(audio_gen, source_lang):
             await self._on_transcript(transcript, ctx)
 
             # Start new context on final transcript (new utterance)
@@ -155,7 +163,9 @@ class TranslationPipeline:
             yield transcript
 
     async def _run_stt_with_vad(
-        self, audio_gen: AsyncGenerator[bytes, None]
+        self, 
+        audio_gen: AsyncGenerator[bytes, None],
+        source_lang: Optional[str] = None
     ) -> AsyncGenerator[Transcript, None]:
         """Run audio through VAD → Soniox STT → translation pipeline."""
 
@@ -165,9 +175,10 @@ class TranslationPipeline:
 
         self._utterance_counter += 1
         ctx = UtteranceContext(utterance_id=f"utt-{self._utterance_counter}")
+        ctx.source_lang = source_lang
         self._active_context = ctx
 
-        async for transcript in self._stt.transcribe_stream(_vad_output()):
+        async for transcript in self._stt.transcribe_stream(_vad_output(), source_lang):
             await self._on_transcript(transcript, ctx)
             yield transcript
 
@@ -249,7 +260,7 @@ class TranslationPipeline:
         # Step 1: Translate to all languages (batch operation, not streaming)
         try:
             translation_start = time.perf_counter()
-            translation_result = await self._translator.translate(text)
+            translation_result = await self._translator.translate(text, source_lang=ctx.source_lang)
             translations = translation_result.translations
             translation_latency = translation_result.latency_ms
             moderation_flag = False  # Already screened in _on_transcript

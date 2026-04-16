@@ -32,6 +32,7 @@ class SonioxConfig:
     num_audio_channels: int
     include_nonfinal: bool
     max_alternatives: int
+    language_code: Optional[str] = None
 
 
 @dataclass

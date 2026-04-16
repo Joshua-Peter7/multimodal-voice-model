@@ -37,26 +37,44 @@ audio:
     silence_threshold_ms: 300
     speech_threshold_ms: 100
 languages:
-- code: hi
-  enabled: true
-  name: Hindi
-  similarity_boost: 0.75
-  stability: 0.5
-  voice_id: ${EL_VOICE_HI}
-- code: te
-  enabled: true
-  name: Telugu
-  similarity_boost: 0.75
-  stability: 0.5
-  voice_id: ${EL_VOICE_TE}
 - code: ta
   enabled: true
   name: Tamil
   similarity_boost: 0.75
   stability: 0.5
   voice_id: ${EL_VOICE_TA}
-- code: es
+- code: en
   enabled: true
+  name: English
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_EN}
+- code: ml
+  enabled: true
+  name: Malayalam
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_ML}
+- code: te
+  enabled: true
+  name: Telugu
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_TE}
+- code: kn
+  enabled: true
+  name: Kannada
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_KN}
+- code: hi
+  enabled: true
+  name: Hindi
+  similarity_boost: 0.75
+  stability: 0.5
+  voice_id: ${EL_VOICE_HI}
+- code: es
+  enabled: false
   name: Spanish
   similarity_boost: 0.75
   stability: 0.5

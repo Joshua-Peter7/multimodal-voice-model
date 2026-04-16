@@ -133,10 +133,11 @@ except Exception as e:
 # ── Speaker WebSocket ────────────────────────────────────────
 
 @app.websocket("/ws/speaker")
-async def speaker_ws(websocket: WebSocket):
+async def speaker_ws(websocket: WebSocket, src_lang: Optional[str] = Query(None)):
     """
     Speaker connects here and streams raw PCM audio (16kHz, 16-bit, mono).
     Each binary message should be a chunk of raw PCM bytes.
+    Pass src_lang query param to specify source language (e.g. ?src_lang=ta).
     """
     global _active_speaker
     session_id = str(uuid.uuid4())[:8]
@@ -158,8 +159,7 @@ async def speaker_ws(websocket: WebSocket):
         return
 
     _active_speaker = session_id
-
-    log.info("speaker_connected", session=session_id)
+    log.info("speaker_connected", session=session_id, src_lang=src_lang)
     
     try:
         await websocket.send_text(json.dumps({
@@ -169,6 +169,7 @@ async def speaker_ws(websocket: WebSocket):
                 "sample_rate": cfg.audio.sample_rate,
                 "channels": cfg.audio.channels,
                 "bit_depth": cfg.audio.bit_depth,
+                "src_lang": src_lang or cfg.source.language_code
             },
         }))
     except Exception as e:
@@ -202,8 +203,8 @@ async def speaker_ws(websocket: WebSocket):
 
     async def _pipeline_task():
         try:
-            log.info("pipeline_task_starting", session=session_id)
-            async for transcript in pipeline.run(_ws_audio_source()):
+            log.info("pipeline_task_starting", session=session_id, src_lang=src_lang)
+            async for transcript in pipeline.run(_ws_audio_source(), source_lang=src_lang):
                 log.info("transcript_received", session=session_id, text=transcript.text[:50])
                 try:
                     await websocket.send_text(json.dumps({

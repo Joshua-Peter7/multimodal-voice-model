@@ -51,11 +51,25 @@ Rules:
 """
 
 
-def _build_user_prompt(source_text: str, languages: List[LanguageConfig]) -> str:
+def _build_user_prompt(source_text: str, languages: List[LanguageConfig], source_lang: Optional[str] = None) -> str:
     lang_list = ", ".join(f"{lang.name} ({lang.code})" for lang in languages)
     response_shape = ", ".join(f'"{lang.code}": "..."' for lang in languages)
+    
+    # Resolve source language name if possible, else use auto-detection hint
+    src_hint = "detect language automatically"
+    if source_lang:
+        # Find the name from config or common mapping
+        for l in cfg.languages:
+            if l.code == source_lang:
+                src_hint = l.name
+                break
+        else:
+            # Fallback for common codes
+            mapping = {"en": "English", "ta": "Tamil", "ml": "Malayalam", "te": "Telugu", "kn": "Kannada", "hi": "Hindi"}
+            src_hint = mapping.get(source_lang, "the source language")
+            
     return (
-        f'Translate the following {cfg.source.language_name} text into: {lang_list}.\n\n'
+        f'Translate the following text ({src_hint}) into: {lang_list}.\n\n'
         f'Text: "{source_text}"\n\n'
         f"Respond only with JSON: {{{response_shape}}}"
     )
@@ -136,6 +150,7 @@ class LLMTranslator:
         self,
         source_text: str,
         languages: Optional[List[LanguageConfig]] = None,
+        source_lang: Optional[str] = None,
     ) -> TranslationResult:
         """
         Translate source_text into all enabled languages in a single LLM call.
@@ -162,7 +177,7 @@ class LLMTranslator:
                 pass  # Fall through to make a new request
 
         # Create the translation task
-        task = asyncio.create_task(self._do_translate(source_text, target_langs, cache_key))
+        task = asyncio.create_task(self._do_translate(source_text, target_langs, cache_key, source_lang))
         self._inflight[cache_key] = task
 
         try:
@@ -175,11 +190,12 @@ class LLMTranslator:
         source_text: str,
         target_langs: List[LanguageConfig],
         cache_key: str,
+        source_lang: Optional[str] = None,
     ) -> TranslationResult:
         """Execute the actual Groq API call."""
         start = time.perf_counter()
 
-        user_prompt = _build_user_prompt(source_text, target_langs)
+        user_prompt = _build_user_prompt(source_text, target_langs, source_lang)
 
         # Groq uses OpenAI-compatible chat completions API
         payload = {

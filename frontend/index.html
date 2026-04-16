@@ -1,37 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Real-time multilingual voice translation broadcast system with ultra-low latency streaming" />
+  <meta name="description"
+    content="Real-time multilingual voice translation broadcast system with ultra-low latency streaming" />
   <title>Real-Time Voice Translation — Live Broadcast</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     :root {
-      --bg: #06080f;
-      --surface: #0e1219;
-      --surface2: #161c28;
-      --surface3: #1e2536;
-      --border: #1f2940;
-      --border-glow: #2a3a5c;
-      --accent: #6366f1;
-      --accent-bright: #818cf8;
-      --accent-glow: rgba(99,102,241,0.15);
-      --accent2: #06d6a0;
-      --accent2-glow: rgba(6,214,160,0.15);
-      --danger: #ef4444;
-      --danger-glow: rgba(239,68,68,0.2);
-      --warning: #f59e0b;
-      --text: #e8ecf4;
-      --text-dim: #8b95a8;
-      --muted: #5a6478;
-      --success: #22c55e;
-      --radius: 14px;
-      --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.3);
-      --shadow-glow: 0 0 32px var(--accent-glow);
+      /* Refined Ventriloc palette: clean, minimal, high-contrast editorial */
+      --bg: #F9F8F6;
+      --surface: #FFFFFF;
+      --surface2: #F3F1ED;
+      --surface3: #EBE9E4;
+      --border: rgba(0, 0, 0, 0.05);
+      --border-strong: rgba(0, 0, 0, 0.12);
+      --accent: #0B6E55;
+      --accent-bright: #0E8A6A;
+      --accent-glow: rgba(11, 110, 85, 0.05);
+      --danger: #D32F2F;
+      --danger-glow: rgba(211, 47, 47, 0.08);
+      --warning: #B45309;
+      --text: #121211;
+      --text-dim: #52524E;
+      --muted: #94948E;
+      --success: #0B6E55;
+      --radius: 12px;
+      --radius-sm: 6px;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 12px 24px -12px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
     }
 
     body {
@@ -42,35 +51,32 @@
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
     }
 
-    /* ── Animated background gradient ── */
+    /* ── Subtle Texture ── */
     body::before {
-      content: '';
+      content: "";
       position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle at 30% 20%, rgba(99,102,241,0.04) 0%, transparent 50%),
-                  radial-gradient(circle at 70% 80%, rgba(6,214,160,0.03) 0%, transparent 50%);
-      animation: bgShift 20s ease-in-out infinite;
-      z-index: -1;
-    }
-    @keyframes bgShift {
-      0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(-5%, 3%); }
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      opacity: 0.015;
+      pointer-events: none;
+      z-index: 9999;
     }
 
     /* ── Header ── */
     header {
-      background: linear-gradient(180deg, var(--surface) 0%, rgba(14,18,25,0.95) 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--border-strong);
+      padding: 14px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      backdrop-filter: blur(12px);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -79,73 +85,64 @@
     .header-left {
       display: flex;
       align-items: center;
-      gap: 14px;
-    }
-
-    .logo {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 0 20px var(--accent-glow);
+      gap: 16px;
     }
 
     header h1 {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.3px;
-      background: linear-gradient(135deg, var(--text) 30%, var(--accent-bright));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.01em;
+      color: var(--text);
     }
 
     .header-subtitle {
       font-size: 11px;
       color: var(--muted);
       font-weight: 400;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.2px;
+      margin-top: 1px;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
 
     .badge {
-      padding: 4px 12px;
-      border-radius: 99px;
+      padding: 5px 12px;
+      border-radius: 6px;
       font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
+      text-transform: uppercase;
     }
+
     .badge-live {
-      background: var(--danger-glow);
+      background: rgba(211, 47, 47, 0.05);
       color: var(--danger);
-      border: 1px solid rgba(239,68,68,0.3);
+      border: 0.5px solid rgba(211, 47, 47, 0.15);
     }
+
     .badge-ok {
-      background: rgba(34,197,94,0.1);
+      background: rgba(11, 110, 85, 0.05);
       color: var(--success);
-      border: 1px solid rgba(34,197,94,0.2);
+      border: 0.5px solid rgba(11, 110, 85, 0.15);
     }
 
     .latency-badge {
-      background: var(--accent-glow);
-      color: var(--accent-bright);
-      border: 1px solid rgba(99,102,241,0.2);
-      padding: 4px 12px;
-      border-radius: 99px;
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 0.5px solid var(--border-strong);
+      padding: 5px 12px;
+      border-radius: 6px;
       font-size: 11px;
-      font-weight: 600;
-      font-family: 'Inter', monospace;
+      font-weight: 700;
+      font-family: 'Fira Code', 'Inter', monospace;
+      letter-spacing: 0.05em;
     }
 
     /* ── Main Layout ── */
@@ -153,18 +150,20 @@
       flex: 1;
       display: grid;
       grid-template-columns: 360px 1fr;
+      /* Expanded from 340px */
       gap: 0;
-      min-height: calc(100vh - 56px);
+      min-height: calc(100vh - 57px);
     }
 
     /* ── Speaker Panel ── */
     .speaker-panel {
       background: var(--surface);
-      border-right: 1px solid var(--border);
-      padding: 24px;
+      border-right: 0.5px solid var(--border-strong);
+      padding: 32px 14px;
+      /* Optimized padding for maximum metric space */
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 32px;
       overflow-y: auto;
     }
 
@@ -172,166 +171,347 @@
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 0.12em;
       color: var(--muted);
-      margin-bottom: 6px;
+      margin-bottom: 12px;
     }
 
     .panel-desc {
-      font-size: 13px;
+      font-size: 13.5px;
       color: var(--text-dim);
-      line-height: 1.5;
+      line-height: 1.6;
+      margin-bottom: 4px;
     }
 
-    /* ── Mic Button ── */
-    .mic-btn {
+    /* ── Divider ── */
+    .divider {
+      height: 0.5px;
+      background: var(--border);
       width: 100%;
-      padding: 16px 20px;
-      border: none;
-      border-radius: var(--radius);
-      background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
+    }
+
+    /* ── Uiverse-inspired Fill Button ── */
+    .mic-btn,
+    .listen-btn {
+      background: transparent;
+      border: 1px solid var(--text);
+      padding: 12px 24px;
+      color: var(--text);
+      text-transform: uppercase;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      position: relative;
+      transition: color 0.5s ease;
       cursor: pointer;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 16px rgba(99,102,241,0.3);
-      position: relative;
-      overflow: hidden;
-    }
-    .mic-btn::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .mic-btn:hover::before { opacity: 1; }
-    .mic-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,102,241,0.4); }
-    .mic-btn:active { transform: translateY(0) scale(0.99); }
-    .mic-btn.recording {
-      background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-      box-shadow: 0 4px 16px var(--danger-glow);
-      animation: pulseRecord 2s ease-in-out infinite;
+      border-radius: 4px;
+      /* Slightly sharper for editorial look */
+      z-index: 1;
     }
 
-    @keyframes pulseRecord {
-      0%, 100% { box-shadow: 0 4px 16px var(--danger-glow); }
-      50% { box-shadow: 0 4px 32px rgba(239,68,68,0.5); }
+    .mic-btn::before,
+    .listen-btn::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 2px;
+      width: 0;
+      background-color: var(--text);
+      transition: 0.5s ease;
+      z-index: 2;
+    }
+
+    .mic-btn:hover,
+    .listen-btn:hover {
+      color: var(--surface);
+      transition-delay: 0.5s;
+    }
+
+    .mic-btn:hover::before,
+    .listen-btn:hover::before {
+      width: 100%;
+    }
+
+    .mic-btn::after,
+    .listen-btn::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 0;
+      width: 100%;
+      background-color: var(--text);
+      transition: 0.4s ease;
+      z-index: -1;
+    }
+
+    .mic-btn:hover::after,
+    .listen-btn:hover::after {
+      height: 100%;
+      transition-delay: 0.4s;
+    }
+
+    /* ── Adjustments for specific buttons ── */
+    .mic-btn {
+      width: 100%;
+    }
+
+    .listen-btn {
+      padding: 8px 16px;
+      font-size: 11px;
+    }
+
+    .lang-select {
+      background: var(--surface);
+      border: 1px solid var(--text);
+      padding: 0 16px;
+      height: 46px; /* Match mic-btn exactly */
+      color: var(--text);
+      text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      border-radius: 4px;
+      cursor: pointer;
+      appearance: none; /* Custom arrow */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+      transition: all 0.3s ease;
+    }
+
+    .lang-select:hover {
+      background-color: var(--surface2);
+      border-color: var(--text-dim);
+    }
+
+    .lang-select:focus {
+      outline: none;
+      border-color: var(--text);
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
+    }
+
+    /* ── Active States ── */
+    .mic-btn.recording {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .mic-btn.recording::after,
+    .mic-btn.recording::before {
+      background-color: var(--danger);
+    }
+
+    .mic-btn.recording:hover {
+      color: white;
+    }
+
+    .listen-btn.listening {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .listen-btn.listening::after,
+    .listen-btn.listening::before {
+      background-color: var(--accent);
+    }
+
+    .listen-btn.listening:hover {
+      color: white;
     }
 
     /* ── Audio Visualizer ── */
     .visualizer-wrapper {
       background: var(--surface2);
-      border: 1px solid var(--border);
+      border: 0.5px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
-      position: relative;
-      overflow: hidden;
+      padding: 32px 20px;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
     }
 
     .visualizer {
-      height: 56px;
+      height: 80px;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+      /* Center for up/down growth */
       gap: 2px;
+      width: 100%;
     }
 
     .bar {
-      width: 3px;
-      background: linear-gradient(180deg, var(--accent-bright), var(--accent));
-      border-radius: 2px;
-      min-height: 3px;
-      transition: height 0.06s ease-out;
-      opacity: 0.85;
+      width: 2px;
+      /* Thin bars for density */
+      height: 2px;
+      background-color: var(--text);
+      /* Black/Dark text color for high contrast */
+      border-radius: 1px;
+      transition: height 0.05s ease;
+      flex-shrink: 0;
     }
 
-    .visualizer-idle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 56px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 500;
+    /* Wave animation for idle state */
+    .visualizer-idle-anim .bar {
+      animation: wave-osc 1.5s ease-in-out infinite;
+    }
+
+    .visualizer-idle-anim .bar:nth-child(2n) {
+      animation-delay: 0.1s;
+    }
+
+    .visualizer-idle-anim .bar:nth-child(3n) {
+      animation-delay: 0.2s;
+    }
+
+    @keyframes wave-osc {
+
+      0%,
+      100% {
+        height: 2px;
+      }
+
+      50% {
+        height: 20px;
+      }
     }
 
     /* ── Transcript Box ── */
     .transcript-box {
       background: var(--surface2);
-      border: 1px solid var(--border);
+      border: 0.5px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
-      min-height: 90px;
-      max-height: 200px;
+      padding: 20px;
+      min-height: 110px;
+      max-height: 220px;
       overflow-y: auto;
-      font-size: 14px;
-      line-height: 1.7;
+      font-size: 14.5px;
+      line-height: 1.85;
+      color: var(--text);
+      transition: all 0.3s ease;
+    }
+
+    .transcript-box .partial {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .transcript-box .final {
       color: var(--text);
     }
-    .transcript-box .partial { color: var(--text-dim); font-style: italic; }
-    .transcript-box .final { color: var(--text); }
-    .transcript-empty { color: var(--muted); font-size: 13px; }
+
+    .transcript-empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
 
     /* ── Metrics Strip ── */
     .metrics-strip {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 6px;
+      /* Tightened gap to fit within sidebar */
     }
 
     .metric {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px;
-      text-align: center;
-      transition: border-color 0.3s;
+      background: var(--surface);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      /* Slightly smaller radius for better fit */
+      padding: 16px 4px;
+      /* Reduced horizontal padding */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      min-height: 100px;
+      overflow: hidden;
     }
-    .metric:hover { border-color: var(--border-glow); }
+
+    .metric:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+
     .metric-label {
-      font-size: 9px;
-      color: var(--muted);
+      font-size: 8px;
+      /* Ultra-condensed for reliability */
+      color: #9A9A95;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      font-weight: 600;
-    }
-    .metric-value {
-      font-size: 22px;
+      letter-spacing: 0.02em;
       font-weight: 800;
-      margin-top: 4px;
-      font-variant-numeric: tabular-nums;
+      width: 100%;
+      text-align: center;
+      padding: 0;
     }
-    .metric-value.latency { color: var(--accent2); }
-    .metric-value.count { color: var(--accent-bright); }
+
+    .metric-value {
+      font-size: 26px;
+      /* Slightly smaller for a more balanced look */
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .metric-value.latency {
+      color: #0B6E55;
+      /* The specific green from 'PIPELINE' dash */
+    }
+
+    .metric-value.count {
+      color: var(--text);
+    }
 
     /* ── Log Box ── */
     .log-box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 10px 14px;
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: var(--surface);
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-family: 'Fira Code', 'JetBrains Mono', monospace;
       font-size: 11px;
-      color: var(--muted);
-      max-height: 120px;
+      color: var(--text-dim);
+      height: 120px;
       overflow-y: auto;
-      line-height: 1.6;
+      line-height: 1.8;
+      box-shadow: var(--shadow-sm);
+      margin-top: 12px;
     }
-    .log-box .log-time { color: var(--text-dim); }
-    .log-box .log-ok { color: var(--success); }
-    .log-box .log-err { color: var(--danger); }
-    .log-box .log-info { color: var(--accent-bright); }
+
+    .log-box .log-time {
+      color: var(--text-dim);
+    }
+
+    .log-box .log-ok {
+      color: var(--accent);
+    }
+
+    .log-box .log-err {
+      color: var(--danger);
+    }
+
+    .log-box .log-info {
+      color: var(--text-dim);
+    }
 
     /* ── Listener Panel ── */
     .listener-panel {
-      padding: 24px;
+      padding: 28px 28px;
       display: flex;
       flex-direction: column;
       gap: 20px;
@@ -343,56 +523,45 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding-bottom: 4px;
+      border-bottom: 0.5px solid var(--border-strong);
+      margin-bottom: 4px;
     }
 
     .channel-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+      gap: 12px;
     }
 
     /* ── Channel Card ── */
     .channel-card {
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 0.5px solid var(--border-strong);
       border-radius: var(--radius);
-      padding: 18px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      gap: 16px;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
-      overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
-    .channel-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
+
+    .channel-card:hover {
+      box-shadow: var(--shadow-card);
+      border-color: var(--accent);
+      transform: translateY(-4px);
     }
-    .channel-card:hover { border-color: var(--border-glow); }
+
     .channel-card.active {
       border-color: var(--accent);
-      box-shadow: 0 0 24px var(--accent-glow), inset 0 0 24px rgba(99,102,241,0.03);
+      background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
     }
-    .channel-card.active::before { opacity: 1; }
+
     .channel-card.streaming {
-      border-color: var(--accent2);
-      box-shadow: 0 0 24px var(--accent2-glow);
-    }
-    .channel-card.streaming::before {
-      opacity: 1;
-      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
-      animation: streamPulse 1.5s ease-in-out infinite;
-    }
-    @keyframes streamPulse {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
     }
 
     .channel-header {
@@ -408,274 +577,333 @@
     }
 
     .lang-flag {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
       background: var(--surface2);
+      border: 0.5px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 15px;
     }
 
-    .lang-name { font-weight: 600; font-size: 15px; letter-spacing: -0.2px; }
+    .lang-name {
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+      color: var(--text);
+    }
+
     .lang-code {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Fira Code', monospace;
       background: var(--surface2);
       padding: 1px 6px;
-      border-radius: 4px;
+      border-radius: 3px;
+      border: 0.5px solid var(--border);
+      letter-spacing: 0.5px;
+      font-weight: 500;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: var(--muted);
+      background: var(--border-strong);
       display: inline-block;
       margin-left: 6px;
       transition: background 0.3s;
+      vertical-align: middle;
     }
-    .status-dot.active { background: var(--success); animation: blink 1s infinite; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-    .listen-btn {
-      padding: 7px 16px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-dim);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .status-dot.active {
+      background: var(--success);
+      animation: blink 1.5s infinite;
     }
-    .listen-btn:hover { background: var(--surface2); border-color: var(--accent); color: var(--text); }
-    .listen-btn.listening {
-      background: linear-gradient(135deg, var(--accent2), #059669);
-      border-color: var(--accent2);
-      color: #000;
-      font-weight: 600;
-      box-shadow: 0 2px 12px var(--accent2-glow);
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
     }
+
+    /* Removal of redundant listen-btn styles superseded by new Fill style */
 
     .translation-text {
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.8;
       color: var(--text);
-      min-height: 48px;
-      padding: 12px 14px;
+      min-height: 52px;
+      padding: 16px;
       background: var(--surface2);
       border-radius: var(--radius-sm);
-      border: 1px solid transparent;
-      transition: all 0.3s;
+      border: 0.5px solid transparent;
+      transition: all 0.3s ease;
     }
-    .translation-text.partial { color: var(--text-dim); font-style: italic; border-color: var(--border); }
-    .translation-text.streaming { border-color: var(--accent2); background: rgba(6,214,160,0.03); }
+
+    .translation-text.partial {
+      color: var(--muted);
+      font-style: italic;
+      border-color: var(--border);
+    }
+
+    .translation-text.streaming {
+      border-color: var(--accent);
+      background: rgba(11, 110, 85, 0.02);
+      animation: streamFade 2s infinite;
+    }
+
+    @keyframes streamFade {
+
+      0%,
+      100% {
+        border-color: var(--accent);
+      }
+
+      50% {
+        border-color: rgba(11, 110, 85, 0.3);
+      }
+    }
 
     .card-latency {
       font-size: 10px;
       color: var(--muted);
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       display: flex;
       align-items: center;
       gap: 6px;
+      letter-spacing: 0.3px;
     }
-    .card-latency .latency-val { color: var(--accent2); font-weight: 600; }
+
+    .card-latency .latency-val {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Scrollbar refinement ── */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 4px;
+    }
 
     /* ── Responsive ── */
     @media (max-width: 860px) {
-      main { grid-template-columns: 1fr; }
-      .speaker-panel { border-right: none; border-bottom: 1px solid var(--border); }
-      .channel-grid { grid-template-columns: 1fr; }
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .speaker-panel {
+        border-right: none;
+        border-bottom: 0.5px solid var(--border-strong);
+      }
+
+      .channel-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
+
 <body>
 
-<header>
-  <div class="header-left">
-    <div class="logo">🌐</div>
-    <div>
-      <h1>Real-Time Voice Translation</h1>
-      <div class="header-subtitle">Soniox STT · Groq Llama 70B · ElevenLabs TTS</div>
-    </div>
-  </div>
-  <div class="header-right">
-    <span class="latency-badge" id="global-latency">— ms</span>
-    <span class="badge badge-ok" id="server-status">● Connecting…</span>
-  </div>
-</header>
-
-<main>
-  <!-- SPEAKER PANEL -->
-  <section class="speaker-panel">
-    <div>
-      <div class="panel-title">Speaker</div>
-      <p class="panel-desc">
-        Speak into your microphone. Your voice is transcribed, translated, and broadcast
-        as audio to all listeners in <strong>under 60ms</strong>.
-      </p>
-    </div>
-
-    <button class="mic-btn" id="mic-btn" onclick="toggle_mic()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-      Start Broadcasting
-    </button>
-
-    <div class="visualizer-wrapper">
-      <div class="visualizer" id="visualizer">
-        <div class="visualizer-idle" id="viz-idle">Waiting for microphone…</div>
+  <header>
+    <div class="header-left">
+      <div>
+        <h1>MULTI-MODAL TRANSLATION</h1>
       </div>
     </div>
-
-    <div>
-      <div class="panel-title">Live Transcript</div>
-      <div class="transcript-box" id="transcript">
-        <span class="transcript-empty">Transcript will appear here…</span>
-      </div>
+    <div class="header-right">
+      <span class="latency-badge" id="global-latency">- ms</span>
+      <span class="badge badge-ok" id="server-status">● Connecting…</span>
     </div>
+  </header>
 
-    <div class="metrics-strip">
-      <div class="metric">
-        <div class="metric-label">Pipeline</div>
-        <div class="metric-value latency" id="m-total">—</div>
+  <main>
+    <!-- SPEAKER PANEL -->
+    <section class="speaker-panel">
+      <div>
+        <div class="panel-title">Speaker</div>
+        <p class="panel-desc">
+          Speak into your microphone. Your voice is transcribed, translated, and broadcast
+          as audio to all listeners in <strong>under Few milliseconds</strong>.
+        </p>
       </div>
-      <div class="metric">
-        <div class="metric-label">Utterances</div>
-        <div class="metric-value count" id="m-utt">0</div>
+
+        <button class="mic-btn" id="mic-btn" onclick="toggle_mic()" style="width: auto; min-width: 220px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        </button>
+
+      <div class="visualizer-wrapper">
+        <div class="visualizer visualizer-idle-anim" id="visualizer">
+          <!-- Bars generated by JS -->
+        </div>
       </div>
-      <div class="metric">
-        <div class="metric-label">Listeners</div>
-        <div class="metric-value count" id="m-ch">—</div>
+
+      <div class="divider"></div>
+
+      <div>
+        <div class="panel-title">Live Transcript</div>
+        <div class="transcript-box" id="transcript">
+          <span class="transcript-empty">Transcript will appear here…</span>
+        </div>
       </div>
-    </div>
 
-    <div>
-      <div class="panel-title">System Log</div>
-      <div class="log-box" id="log-box"></div>
-    </div>
-  </section>
+      <div class="metrics-strip">
+        <div class="metric">
+          <div class="metric-label">Pipeline</div>
+          <div class="metric-value latency" id="m-total">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Utterance</div>
+          <div class="metric-value count" id="m-utt">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Listeners</div>
+          <div class="metric-value count" id="m-ch">—</div>
+        </div>
+      </div>
 
-  <!-- LISTENER PANEL -->
-  <section class="listener-panel">
-    <div class="listener-header">
-      <div class="panel-title">Language Channels</div>
-      <span class="panel-desc" style="font-size:12px">Click "Listen" to receive real-time translated audio</span>
-    </div>
-    <div class="channel-grid" id="channel-grid"></div>
-  </section>
-</main>
+    </section>
 
-<script>
-// ═════════════════════════════════════════════════════════════════════════════
-// MODERN AUDIOWORKLET + IMPROVED WEBSOCKET IMPLEMENTATION
-// Features: Worker-thread audio processing, exponential backoff reconnection,
-//           robust error handling, better state management
-// ═════════════════════════════════════════════════════════════════════════════
+    <!-- LISTENER PANEL -->
+    <section class="listener-panel">
+      <div class="listener-header">
+        <div class="panel-title" style="margin-bottom:0">Language Channels</div>
+        <span class="panel-desc" style="font-size:12px">Click "Listen" to receive real-time translated audio</span>
+      </div>
+      <div class="channel-grid" id="channel-grid"></div>
 
-const CONFIG = {
-  ws_base: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`,
-  speaker_path: '/ws/speaker',
-  listener_path: '/ws/listener',
-  audio_sample_rate: 16000,
-  audioworklet_path: '/static/audio-processor.js',
-  recon_attempts_max: 5,
-  recon_initial_delay_ms: 500,
-};
+      <div class="divider" style="margin-top: 24px"></div>
 
-const LANG_FLAGS = {
-  hi: '🇮🇳', te: '🇮🇳', ta: '🇮🇳', es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪',
-  ja: '🇯🇵', ko: '🇰🇷', zh: '🇨🇳', ar: '🇸🇦', pt: '🇧🇷', ru: '🇷🇺',
-  it: '🇮🇹', nl: '🇳🇱', pl: '🇵🇱', tr: '🇹🇷', vi: '🇻🇳', th: '🇹🇭',
-};
+      <div style="margin-top: 24px">
+        <div class="panel-title">System Activity Log</div>
+        <div class="log-box" id="log-box"></div>
+      </div>
+    </section>
+  </main>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STATE MANAGEMENT
-// ─────────────────────────────────────────────────────────────────────────────
+  <script>
+    // ═════════════════════════════════════════════════════════════════════════════
+    // MODERN AUDIOWORKLET + IMPROVED WEBSOCKET IMPLEMENTATION
+    // Features: Worker-thread audio processing, exponential backoff reconnection,
+    //           robust error handling, better state management
+    // ═════════════════════════════════════════════════════════════════════════════
 
-class AppState {
-  constructor() {
-    this.speaker_ws = null;
-    this.media_stream = null;
-    this.audio_ctx = null;
-    this.audio_worklet = null;
-    this.analyser = null;
-    this.anim_frame = null;
-    this.recording = false;
-    this.utterance_count = 0;
-    this.speaker_reconnect_attempts = 0;
-    this.listener_ws_map = {};
-    this.listener_audio_contexts = {};
-    this.bars = [];
-  }
+    const CONFIG = {
+      ws_base: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`,
+      speaker_path: '/ws/speaker',
+      listener_path: '/ws/listener',
+      audio_sample_rate: 16000,
+      audioworklet_path: '/static/audio-processor.js',
+      recon_attempts_max: 5,
+      recon_initial_delay_ms: 500,
+    };
 
-  reset_recording() {
-    this.recording = false;
-    this.speaker_reconnect_attempts = 0;
-    this.audio_worklet = null;
-    this.analyser = null;
-  }
-}
+    const LANG_FLAGS = {
+      ta: '🇮🇳', en: '🇺🇸', ml: '🇮🇳', te: '🇮🇳', kn: '🇮🇳', hi: '🇮🇳',
+      es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪', ja: '🇯🇵', ko: '🇰🇷', zh: '🇨🇳', ar: '🇸🇦',
+    };
 
-const state = new AppState();
+    // ─────────────────────────────────────────────────────────────────────────────
+    // STATE MANAGEMENT
+    // ─────────────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LOGGING & UI HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+    class AppState {
+      constructor() {
+        this.speaker_ws = null;
+        this.media_stream = null;
+        this.audio_ctx = null;
+        this.audio_worklet = null;
+        this.analyser = null;
+        this.anim_frame = null;
+        this.recording = false;
+        this.utterance_count = 0;
+        this.speaker_reconnect_attempts = 0;
+        this.listener_ws_map = {};
+        this.listener_audio_contexts = {};
+        this.bars = [];
+      }
 
-function log(msg, type = 'info') {
-  const box = document.getElementById('log-box');
-  const line = document.createElement('div');
-  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-  line.innerHTML = `<span class="log-time">${time}</span> <span class="log-${type}">${msg}</span>`;
-  box.prepend(line);
-  if (box.children.length > 50) box.lastChild.remove();
-  console.log(`[${type}] ${msg}`);
-}
+      reset_recording() {
+        this.recording = false;
+        this.speaker_reconnect_attempts = 0;
+        this.audio_worklet = null;
+        this.analyser = null;
+      }
+    }
 
-async function check_health() {
-  try {
-    const r = await fetch('/health');
-    const data = await r.json();
-    document.getElementById('server-status').textContent = '● Online';
-    document.getElementById('server-status').className = 'badge badge-ok';
-    const total = Object.values(data.channels || {}).reduce((a, b) => a + b, 0);
-    document.getElementById('m-ch').textContent = total;
-  } catch (e) {
-    document.getElementById('server-status').textContent = '● Offline';
-    document.getElementById('server-status').className = 'badge badge-live';
-  }
-}
+    const state = new AppState();
 
-async function load_languages() {
-  try {
-    const r = await fetch('/languages');
-    const data = await r.json();
-    render_channels(data.targets);
-  } catch (e) {
-    log('Failed to load languages: ' + e.message, 'err');
-  }
-}
+    // ─────────────────────────────────────────────────────────────────────────────
+    // LOGGING & UI HELPERS
+    // ─────────────────────────────────────────────────────────────────────────────
 
-function render_channels(targets) {
-  const grid = document.getElementById('channel-grid');
-  grid.innerHTML = '';
-  targets.forEach(lang => {
-    const flag = LANG_FLAGS[lang.code] || '🌍';
-    const card = document.createElement('div');
-    card.className = 'channel-card';
-    card.id = `card-${lang.code}`;
-    card.innerHTML = `
+    function log(msg, type = 'info') {
+      const box = document.getElementById('log-box');
+      const line = document.createElement('div');
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+      line.innerHTML = `<span class="log-time">${time}</span> <span class="log-${type}">${msg}</span>`;
+      box.prepend(line);
+      if (box.children.length > 50) box.lastChild.remove();
+      console.log(`[${type}] ${msg}`);
+    }
+
+    async function check_health() {
+      try {
+        const r = await fetch('/health');
+        const data = await r.json();
+        document.getElementById('server-status').textContent = '● Online';
+        document.getElementById('server-status').className = 'badge badge-ok';
+        const total = Object.values(data.channels || {}).reduce((a, b) => a + b, 0);
+        document.getElementById('m-ch').textContent = total;
+      } catch (e) {
+        document.getElementById('server-status').textContent = '● Offline';
+        document.getElementById('server-status').className = 'badge badge-live';
+      }
+    }
+
+    async function load_languages() {
+      try {
+        const r = await fetch('/languages');
+        const data = await r.json();
+        render_channels(data.targets);
+      } catch (e) {
+        log('Failed to load languages: ' + e.message, 'err');
+      }
+    }
+
+    function render_channels(targets) {
+      const grid = document.getElementById('channel-grid');
+      grid.innerHTML = '';
+      targets.forEach(lang => {
+        const flag = LANG_FLAGS[lang.code] || '🌍';
+        const card = document.createElement('div');
+        card.className = 'channel-card';
+        card.id = `card-${lang.code}`;
+        card.innerHTML = `
       <div class="channel-header">
         <div class="lang-info">
           <div class="lang-flag">${flag}</div>
@@ -685,7 +913,7 @@ function render_channels(targets) {
           </div>
         </div>
         <button class="listen-btn" id="btn-${lang.code}" onclick="toggle_listen('${lang.code}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Listen
         </button>
       </div>
@@ -694,448 +922,454 @@ function render_channels(targets) {
         <span>Pipeline:</span> <span class="latency-val" id="lat-val-${lang.code}">—</span>
       </div>
     `;
-    grid.appendChild(card);
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AUDIOWORKLET INITIALIZATION
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function setup_audioworklet(audio_context) {
-  try {
-    log('🎛️ Loading AudioWorklet processor…', 'info');
-    await audio_context.audioWorklet.addModule(CONFIG.audioworklet_path);
-    const worklet = new AudioWorkletNode(audio_context, 'audio-processor');
-    log('✅ AudioWorklet loaded successfully', 'ok');
-    return worklet;
-  } catch (err) {
-    log(`⚠️ AudioWorklet failed: ${err.message}. Falling back to ScriptProcessor…`, 'warn');
-    return null;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AUDIO CONVERSION UTILITIES
-// ─────────────────────────────────────────────────────────────────────────────
-
-function float32_to_int16(float32) {
-  const int16 = new Int16Array(float32.length);
-  for (let i = 0; i < float32.length; i++) {
-    const s = Math.max(-1, Math.min(1, float32[i]));
-    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
-  return int16;
-}
-
-function int16_to_float32(int16) {
-  const float32 = new Float32Array(int16.length);
-  for (let i = 0; i < int16.length; i++) {
-    float32[i] = int16[i] / 32768.0;
-  }
-  return float32;
-}
-
-function base64_to_arraybuffer(b64) {
-  const binary = atob(b64);
-  const buf = new ArrayBuffer(binary.length);
-  const view = new Uint8Array(buf);
-  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
-  return buf;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SPEAKER (MICROPHONE BROADCASTER)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function toggle_mic() {
-  console.log('🎚️ Toggle mic called, recording state:', state.recording);
-  log('🎚️ Toggle mic button pressed', 'info');
-  if (state.recording) {
-    stop_mic();
-  } else {
-    await start_mic();
-  }
-}
-
-async function start_mic() {
-  try {
-    log('🎙️ Requesting microphone…', 'info');
-    state.media_stream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: CONFIG.audio_sample_rate, channelCount: 1, echoCancellation: true, noiseSuppression: false },
-    });
-    log('✅ Microphone granted', 'ok');
-  } catch (err) {
-    log(`❌ Microphone denied: ${err.message}`, 'err');
-    return;
-  }
-
-  try {
-    state.audio_ctx = new AudioContext({ sampleRate: CONFIG.audio_sample_rate });
-    const source = state.audio_ctx.createMediaStreamSource(state.media_stream);
-
-    state.analyser = state.audio_ctx.createAnalyser();
-    state.analyser.fftSize = 256;
-    source.connect(state.analyser);
-
-    // Try AudioWorklet first; fallback to ScriptProcessor
-    state.audio_worklet = await setup_audioworklet(state.audio_ctx);
-    let audio_chunks_sent = 0;
-
-    if (state.audio_worklet) {
-      // ─ AudioWorklet Path (Modern, Preferred) ─
-      source.connect(state.audio_worklet);
-      state.audio_worklet.connect(state.audio_ctx.destination);
-      state.audio_worklet.port.onmessage = (evt) => {
-        if (!state.recording || state.speaker_ws?.readyState !== WebSocket.OPEN) return;
-        const payload = evt.data;
-        if (payload.type === 'audio' && payload.data) {
-          const int16_data = payload.data;
-          state.speaker_ws.send(int16_data.buffer);
-          audio_chunks_sent++;
-          if (audio_chunks_sent === 1) log('📊 Audio streaming (AudioWorklet)', 'ok');
-          else if (audio_chunks_sent % 200 === 0) log(`📊 ${audio_chunks_sent} chunks sent`, 'info');
-        }
-      };
-    } else {
-      // ─ ScriptProcessor Fallback ─
-      const proc = state.audio_ctx.createScriptProcessor(512, 1, 1);
-      source.connect(proc);
-      proc.connect(state.audio_ctx.destination);
-      proc.onaudioprocess = (evt) => {
-        if (!state.recording || state.speaker_ws?.readyState !== WebSocket.OPEN) return;
-        const float32 = evt.inputBuffer.getChannelData(0);
-        const int16 = float32_to_int16(float32);
-        state.speaker_ws.send(int16.buffer);
-        audio_chunks_sent++;
-        if (audio_chunks_sent === 1) log('📊 Audio streaming (ScriptProcessor fallback)', 'ok');
-        else if (audio_chunks_sent % 200 === 0) log(`📊 ${audio_chunks_sent} chunks sent`, 'info');
-      };
+        grid.appendChild(card);
+      });
     }
 
-    log('🔌 Connecting to backend…', 'info');
-    connect_speaker_ws();
-  } catch (err) {
-    log(`❌ Audio setup error: ${err.message}`, 'err');
-    stop_mic();
-  }
-}
+    // ─────────────────────────────────────────────────────────────────────────────
+    // AUDIOWORKLET INITIALIZATION
+    // ─────────────────────────────────────────────────────────────────────────────
 
-function connect_speaker_ws() {
-  if (state.speaker_reconnect_attempts > CONFIG.recon_attempts_max) {
-    log('❌ Max reconnection attempts reached', 'err');
-    stop_mic();
-    return;
-  }
-
-  try {
-    state.speaker_ws = new WebSocket(CONFIG.ws_base + CONFIG.speaker_path);
-    state.speaker_ws.binaryType = 'arraybuffer';
-
-    state.speaker_ws.onopen = () => {
-      state.recording = true;
-      state.speaker_reconnect_attempts = 0;
-      log('✅ Speaker stream connected', 'ok');
-      update_mic_ui(true);
-      start_visualizer();
-    };
-
-    state.speaker_ws.onmessage = (evt) => {
+    async function setup_audioworklet(audio_context) {
       try {
-        const msg = JSON.parse(evt.data);
-        if (msg.type === 'ping') state.speaker_ws.send(JSON.stringify({ type: 'pong' }));
-        
-        if (msg.type === 'error') {
-          log(`❌ Backend error: ${msg.message}`, 'err');
-        }
-        
-        if (msg.type === 'transcript') {
-          log(`📝 Transcript${msg.is_final ? ' (final)' : '  (partial)'}: ${msg.text.substring(0, 50)}...`, 'ok');
-          const trans = document.getElementById('transcript');
-          if (trans) {
-            trans.innerHTML = `<span class="${msg.is_final ? 'final' : 'partial'}">${msg.text}</span>`;
-          }
-        }
-      } catch (e) {
-        console.error('Error parsing WebSocket message:', e, evt.data);
+        log('Loading AudioWorklet processor…', 'info');
+        await audio_context.audioWorklet.addModule(CONFIG.audioworklet_path);
+        const worklet = new AudioWorkletNode(audio_context, 'audio-processor');
+        log('AudioWorklet loaded successfully', 'ok');
+        return worklet;
+      } catch (err) {
+        log(`AudioWorklet failed: ${err.message}. Falling back to ScriptProcessor…`, 'info');
+        return null;
       }
-    };
+    }
 
-    state.speaker_ws.onerror = (err) => {
-      log('❌ Speaker WebSocket error: ' + (err?.message || 'Unknown error'), 'err');
-    };
+    // ─────────────────────────────────────────────────────────────────────────────
+    // AUDIO CONVERSION UTILITIES
+    // ─────────────────────────────────────────────────────────────────────────────
 
-    state.speaker_ws.onclose = () => {
+    function float32_to_int16(float32) {
+      const int16 = new Int16Array(float32.length);
+      for (let i = 0; i < float32.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32[i]));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return int16;
+    }
+
+    function int16_to_float32(int16) {
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768.0;
+      }
+      return float32;
+    }
+
+    function base64_to_arraybuffer(b64) {
+      const binary = atob(b64);
+      const buf = new ArrayBuffer(binary.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+      return buf;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // SPEAKER (MICROPHONE BROADCASTER)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    async function toggle_mic() {
+      console.log('Toggle mic called, recording state:', state.recording);
+      log('Toggle mic button pressed', 'info');
       if (state.recording) {
-        state.speaker_reconnect_attempts++;
-        const delay = CONFIG.recon_initial_delay_ms * Math.pow(2, state.speaker_reconnect_attempts - 1);
-        log(`🔄 Reconnecting in ${delay}ms (attempt ${state.speaker_reconnect_attempts})…`, 'info');
-        setTimeout(() => {
-          if (state.recording) connect_speaker_ws();
-        }, delay);
+        stop_mic();
       } else {
-        log('⏹️ Speaker disconnected', 'info');
+        await start_mic();
+      }
+    }
+
+    async function start_mic() {
+      try {
+        log('Requesting microphone…', 'info');
+        state.media_stream = await navigator.mediaDevices.getUserMedia({
+          audio: { sampleRate: CONFIG.audio_sample_rate, channelCount: 1, echoCancellation: true, noiseSuppression: false },
+        });
+        log('Microphone granted', 'ok');
+      } catch (err) {
+        log(`Microphone denied: ${err.message}`, 'err');
+        return;
+      }
+
+      try {
+        state.audio_ctx = new AudioContext({ sampleRate: CONFIG.audio_sample_rate });
+        const source = state.audio_ctx.createMediaStreamSource(state.media_stream);
+
+        state.analyser = state.audio_ctx.createAnalyser();
+        state.analyser.fftSize = 256;
+        source.connect(state.analyser);
+
+        state.audio_worklet = await setup_audioworklet(state.audio_ctx);
+        let audio_chunks_sent = 0;
+
+        if (state.audio_worklet) {
+          source.connect(state.audio_worklet);
+          state.audio_worklet.connect(state.audio_ctx.destination);
+          state.audio_worklet.port.onmessage = (evt) => {
+            if (!state.recording || state.speaker_ws?.readyState !== WebSocket.OPEN) return;
+            const payload = evt.data;
+            if (payload.type === 'audio' && payload.data) {
+              const int16_data = payload.data;
+              state.speaker_ws.send(int16_data.buffer);
+              audio_chunks_sent++;
+              if (audio_chunks_sent === 1) log('Audio streaming (AudioWorklet)', 'ok');
+              else if (audio_chunks_sent % 200 === 0) log(`${audio_chunks_sent} chunks sent`, 'info');
+            }
+          };
+        } else {
+          const proc = state.audio_ctx.createScriptProcessor(512, 1, 1);
+          source.connect(proc);
+          proc.connect(state.audio_ctx.destination);
+          proc.onaudioprocess = (evt) => {
+            if (!state.recording || state.speaker_ws?.readyState !== WebSocket.OPEN) return;
+            const float32 = evt.inputBuffer.getChannelData(0);
+            const int16 = float32_to_int16(float32);
+            state.speaker_ws.send(int16.buffer);
+            audio_chunks_sent++;
+            if (audio_chunks_sent === 1) log('Audio streaming (ScriptProcessor fallback)', 'ok');
+            else if (audio_chunks_sent % 200 === 0) log(`${audio_chunks_sent} chunks sent`, 'info');
+          };
+        }
+
+        log('Connecting to backend…', 'info');
+        connect_speaker_ws();
+      } catch (err) {
+        log(`Audio setup error: ${err.message}`, 'err');
         stop_mic();
       }
-    };
-  } catch (err) {
-    log(`❌ WebSocket creation error: ${err.message}`, 'err');
-    stop_mic();
-  }
-}
-
-function stop_mic() {
-  const was_recording = state.recording;
-  state.reset_recording();
-  update_mic_ui(false);
-  if (state.anim_frame) cancelAnimationFrame(state.anim_frame);
-  state.media_stream?.getTracks().forEach(t => t.stop());
-  state.media_stream = null;
-  if (state.speaker_ws?.readyState === WebSocket.OPEN) {
-    try {
-      state.speaker_ws.send(JSON.stringify({ type: 'end' }));
-      state.speaker_ws.close();
-    } catch {}
-  }
-  reset_visualizer();
-  state.speaker_ws = null;
-  if (state.audio_ctx) {
-    try { state.audio_ctx.close(); } catch {}
-    state.audio_ctx = null;
-  }
-  if (was_recording) log('⏹️ Broadcasting stopped', 'info');
-}
-
-function update_mic_ui(is_recording) {
-  const btn = document.getElementById('mic-btn');
-  if (is_recording) {
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop Broadcasting`;
-    btn.className = 'mic-btn recording';
-  } else {
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Start Broadcasting`;
-    btn.className = 'mic-btn';
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VISUALIZER
-// ─────────────────────────────────────────────────────────────────────────────
-
-function start_visualizer() {
-  const viz = document.getElementById('visualizer');
-  const idle = document.getElementById('viz-idle');
-  if (idle) idle.remove();
-  viz.innerHTML = '';
-  state.bars = [];
-  
-  for (let i = 0; i < 48; i++) {
-    const bar = document.createElement('div');
-    bar.className = 'bar';
-    bar.style.height = '3px';
-    viz.appendChild(bar);
-    state.bars.push(bar);
-  }
-
-  const data = new Uint8Array(state.analyser.frequencyBinCount);
-  function draw() {
-    state.anim_frame = requestAnimationFrame(draw);
-    state.analyser.getByteFrequencyData(data);
-    state.bars.forEach((bar, i) => {
-      const idx = Math.floor(i * data.length / state.bars.length);
-      const h = Math.max(3, (data[idx] / 255) * 52);
-      bar.style.height = `${h}px`;
-    });
-  }
-  draw();
-}
-
-function reset_visualizer() {
-  const viz = document.getElementById('visualizer');
-  viz.innerHTML = '<div class="visualizer-idle" id="viz-idle">Waiting for microphone…</div>';
-  state.bars = [];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LISTENERS (LANGUAGE CHANNELS)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ensure_listener_audio_ctx(lang_code) {
-  if (state.listener_audio_contexts[lang_code]) {
-    return state.listener_audio_contexts[lang_code];
-  }
-  const ctx = new AudioContext({ sampleRate: CONFIG.audio_sample_rate });
-  const audio_state = {
-    ctx,
-    next_start_time: 0,
-    total_chunks: 0,
-  };
-  state.listener_audio_contexts[lang_code] = audio_state;
-  return audio_state;
-}
-
-function schedule_audio_chunk(lang_code, pcm_data) {
-  const audio_state = ensure_listener_audio_ctx(lang_code);
-  const ctx = audio_state.ctx;
-
-  if (ctx.state === 'suspended') ctx.resume();
-
-  const int16 = new Int16Array(pcm_data);
-  const float32 = int16_to_float32(int16);
-
-  const buffer = ctx.createBuffer(1, float32.length, CONFIG.audio_sample_rate);
-  buffer.getChannelData(0).set(float32);
-
-  const now = ctx.currentTime;
-  const start_time = Math.max(now, audio_state.next_start_time);
-
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(ctx.destination);
-  source.start(start_time);
-
-  audio_state.next_start_time = start_time + buffer.duration;
-  audio_state.total_chunks++;
-}
-
-function toggle_listen(lang_code) {
-  if (state.listener_ws_map[lang_code]) {
-    state.listener_ws_map[lang_code].close();
-    delete state.listener_ws_map[lang_code];
-
-    if (state.listener_audio_contexts[lang_code]) {
-      state.listener_audio_contexts[lang_code].ctx.close();
-      delete state.listener_audio_contexts[lang_code];
     }
 
-    document.getElementById(`btn-${lang_code}`).innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Listen';
-    document.getElementById(`btn-${lang_code}`).classList.remove('listening');
-    document.getElementById(`dot-${lang_code}`).classList.remove('active');
-    document.getElementById(`card-${lang_code}`).classList.remove('active', 'streaming');
-  } else {
-    start_listening(lang_code);
-  }
-}
-
-function start_listening(lang_code) {
-  const ws = new WebSocket(CONFIG.ws_base + CONFIG.listener_path + '/' + lang_code);
-  ws.binaryType = 'arraybuffer';
-  state.listener_ws_map[lang_code] = ws;
-
-  ws.onopen = () => {
-    log(`🎧 Listening: ${lang_code}`, 'ok');
-    document.getElementById(`btn-${lang_code}`).innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
-    document.getElementById(`btn-${lang_code}`).classList.add('listening');
-    document.getElementById(`dot-${lang_code}`).classList.add('active');
-    document.getElementById(`card-${lang_code}`).classList.add('active');
-  };
-
-  ws.onmessage = (evt) => {
-    let payload;
-    try {
-      const text = typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data);
-      payload = JSON.parse(text);
-    } catch { return; }
-
-    if (payload.type === 'ping') {
-      ws.send(JSON.stringify({ type: 'pong' }));
-      return;
-    }
-
-    // Immediate translation update
-    if (payload.type === 'translation_update') {
-      const trans_el = document.getElementById(`trans-${lang_code}`);
-      if (trans_el) {
-        trans_el.textContent = payload.translated_text;
-        trans_el.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
+    function connect_speaker_ws() {
+      if (state.speaker_reconnect_attempts > CONFIG.recon_attempts_max) {
+        log('Max reconnection attempts reached', 'err');
+        stop_mic();
+        return;
       }
-      if (payload.latency_ms) {
-        document.getElementById(`lat-val-${lang_code}`).textContent = `${Math.round(payload.latency_ms)}ms`;
+
+      try {
+        const srcLang = ""; // Use backend auto-detection
+        const wsUrl = `${CONFIG.ws_base}${CONFIG.speaker_path}${srcLang ? '?src_lang=' + srcLang : ''}`;
+        state.speaker_ws = new WebSocket(wsUrl);
+        state.speaker_ws.binaryType = 'arraybuffer';
+
+        state.speaker_ws.onopen = () => {
+          state.recording = true;
+          state.speaker_reconnect_attempts = 0;
+          log('Speaker stream connected', 'ok');
+          update_mic_ui(true);
+          start_visualizer();
+        };
+
+        state.speaker_ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg.type === 'ping') state.speaker_ws.send(JSON.stringify({ type: 'pong' }));
+            if (msg.type === 'error') {
+              log(`Backend error: ${msg.message}`, 'err');
+            }
+            if (msg.type === 'transcript') {
+              log(`Transcript${msg.is_final ? ' (final)' : ' (partial)'}: ${msg.text.substring(0, 50)}...`, 'ok');
+              const trans = document.getElementById('transcript');
+              if (trans) {
+                trans.innerHTML = `<span class="${msg.is_final ? 'final' : 'partial'}">${msg.text}</span>`;
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing WebSocket message:', e, evt.data);
+          }
+        };
+
+        state.speaker_ws.onerror = (err) => {
+          log('Speaker WebSocket error: ' + (err?.message || 'Unknown error'), 'err');
+        };
+
+        state.speaker_ws.onclose = () => {
+          if (state.recording) {
+            state.speaker_reconnect_attempts++;
+            const delay = CONFIG.recon_initial_delay_ms * Math.pow(2, state.speaker_reconnect_attempts - 1);
+            log(`Reconnecting in ${delay}ms (attempt ${state.speaker_reconnect_attempts})…`, 'info');
+            setTimeout(() => {
+              if (state.recording) connect_speaker_ws();
+            }, delay);
+          } else {
+            log('Speaker disconnected', 'info');
+            stop_mic();
+          }
+        };
+      } catch (err) {
+        log(`WebSocket creation error: ${err.message}`, 'err');
+        stop_mic();
       }
-      return;
     }
 
-    // Streaming audio chunk
-    if (payload.type === 'audio_chunk' && payload.audio_b64) {
-      document.getElementById(`card-${lang_code}`)?.classList.add('streaming');
-      const audio_data = base64_to_arraybuffer(payload.audio_b64);
-      schedule_audio_chunk(lang_code, audio_data);
+    function stop_mic() {
+      const was_recording = state.recording;
+      state.reset_recording();
+      update_mic_ui(false);
+      if (state.anim_frame) cancelAnimationFrame(state.anim_frame);
+      state.media_stream?.getTracks().forEach(t => t.stop());
+      state.media_stream = null;
+      if (state.speaker_ws?.readyState === WebSocket.OPEN) {
+        try {
+          state.speaker_ws.send(JSON.stringify({ type: 'end' }));
+          state.speaker_ws.close();
+        } catch { }
+      }
+      reset_visualizer();
+      state.speaker_ws = null;
+      if (state.audio_ctx) {
+        try { state.audio_ctx.close(); } catch { }
+        state.audio_ctx = null;
+      }
+      if (was_recording) log('Broadcasting stopped', 'info');
+    }
 
-      if (payload.translated_text) {
-        const trans_el = document.getElementById(`trans-${lang_code}`);
-        if (trans_el) {
-          trans_el.textContent = payload.translated_text;
-          trans_el.className = 'translation-text streaming';
+    function update_mic_ui(is_recording) {
+      const btn = document.getElementById('mic-btn');
+      if (is_recording) {
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop Broadcasting`;
+        btn.className = 'mic-btn recording';
+      } else {
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Start Broadcasting`;
+        btn.className = 'mic-btn';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // VISUALIZER
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    function start_visualizer() {
+      const viz = document.getElementById('visualizer');
+      viz.classList.remove('visualizer-idle-anim');
+      viz.innerHTML = '';
+      state.bars = [];
+
+      const barCount = 80; // High density for waveform feel
+      for (let i = 0; i < barCount; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        viz.appendChild(bar);
+        state.bars.push(bar);
+      }
+
+      const data = new Uint8Array(state.analyser.fftSize);
+
+      function draw() {
+        state.anim_frame = requestAnimationFrame(draw);
+        state.analyser.getByteTimeDomainData(data); // Using Time Domain for waveform
+
+        const step = Math.floor(data.length / barCount);
+        state.bars.forEach((bar, i) => {
+          // Calculate amplitude from center (128 is silence)
+          let val = data[i * step];
+          let amplitude = Math.abs(val - 128);
+          let h = Math.max(2, (amplitude / 128) * 80);
+          bar.style.height = `${h}px`;
+        });
+      }
+      draw();
+    }
+
+    function reset_visualizer() {
+      const viz = document.getElementById('visualizer');
+      viz.classList.add('visualizer-idle-anim');
+      viz.innerHTML = '';
+      for (let i = 0; i < 80; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        viz.appendChild(bar);
+      }
+    }
+
+    // Initial state for visualizer
+    document.addEventListener('DOMContentLoaded', reset_visualizer);
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // LISTENERS (LANGUAGE CHANNELS)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    function ensure_listener_audio_ctx(lang_code) {
+      if (state.listener_audio_contexts[lang_code]) {
+        return state.listener_audio_contexts[lang_code];
+      }
+      const ctx = new AudioContext({ sampleRate: CONFIG.audio_sample_rate });
+      const audio_state = {
+        ctx,
+        next_start_time: 0,
+        total_chunks: 0,
+      };
+      state.listener_audio_contexts[lang_code] = audio_state;
+      return audio_state;
+    }
+
+    function schedule_audio_chunk(lang_code, pcm_data) {
+      const audio_state = ensure_listener_audio_ctx(lang_code);
+      const ctx = audio_state.ctx;
+
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const int16 = new Int16Array(pcm_data);
+      const float32 = int16_to_float32(int16);
+
+      const buffer = ctx.createBuffer(1, float32.length, CONFIG.audio_sample_rate);
+      buffer.getChannelData(0).set(float32);
+
+      const now = ctx.currentTime;
+      const start_time = Math.max(now, audio_state.next_start_time);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(start_time);
+
+      audio_state.next_start_time = start_time + buffer.duration;
+      audio_state.total_chunks++;
+    }
+
+    function toggle_listen(lang_code) {
+      if (state.listener_ws_map[lang_code]) {
+        state.listener_ws_map[lang_code].close();
+        delete state.listener_ws_map[lang_code];
+
+        if (state.listener_audio_contexts[lang_code]) {
+          state.listener_audio_contexts[lang_code].ctx.close();
+          delete state.listener_audio_contexts[lang_code];
         }
-      }
 
-      if (payload.latency_ms) {
-        document.getElementById(`lat-val-${lang_code}`).textContent = `${Math.round(payload.latency_ms)}ms`;
-        document.getElementById('global-latency').textContent = `${Math.round(payload.latency_ms)}ms`;
+        document.getElementById(`btn-${lang_code}`).innerHTML =
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Listen';
+        document.getElementById(`btn-${lang_code}`).classList.remove('listening');
+        document.getElementById(`dot-${lang_code}`).classList.remove('active');
+        document.getElementById(`card-${lang_code}`).classList.remove('active', 'streaming');
+      } else {
+        start_listening(lang_code);
       }
-      return;
     }
 
-    // Stream complete
-    if (payload.type === 'stream_complete') {
-      document.getElementById(`card-${lang_code}`)?.classList.remove('streaming');
-      if (payload.translated_text) {
-        const trans_el = document.getElementById(`trans-${lang_code}`);
-        if (trans_el) {
-          trans_el.textContent = payload.translated_text;
-          trans_el.className = 'translation-text';
+    function start_listening(lang_code) {
+      const ws = new WebSocket(CONFIG.ws_base + CONFIG.listener_path + '/' + lang_code);
+      ws.binaryType = 'arraybuffer';
+      state.listener_ws_map[lang_code] = ws;
+
+      ws.onopen = () => {
+        log(`Listening: ${lang_code}`, 'ok');
+        document.getElementById(`btn-${lang_code}`).innerHTML =
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
+        document.getElementById(`btn-${lang_code}`).classList.add('listening');
+        document.getElementById(`dot-${lang_code}`).classList.add('active');
+        document.getElementById(`card-${lang_code}`).classList.add('active');
+      };
+
+      ws.onmessage = (evt) => {
+        let payload;
+        try {
+          const text = typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data);
+          payload = JSON.parse(text);
+        } catch { return; }
+
+        if (payload.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong' }));
+          return;
         }
-      }
-      if (payload.is_final) {
-        state.utterance_count++;
-        document.getElementById('m-utt').textContent = state.utterance_count;
-        document.getElementById('m-total').textContent = `${Math.round(payload.latency_ms)}ms`;
-      }
-      return;
+
+        if (payload.type === 'translation_update') {
+          const trans_el = document.getElementById(`trans-${lang_code}`);
+          if (trans_el) {
+            trans_el.textContent = payload.translated_text;
+            trans_el.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
+          }
+          if (payload.latency_ms) {
+            document.getElementById(`lat-val-${lang_code}`).textContent = `${Math.round(payload.latency_ms)}ms`;
+          }
+          return;
+        }
+
+        if (payload.type === 'audio_chunk' && payload.audio_b64) {
+          document.getElementById(`card-${lang_code}`)?.classList.add('streaming');
+          const audio_data = base64_to_arraybuffer(payload.audio_b64);
+          schedule_audio_chunk(lang_code, audio_data);
+
+          if (payload.translated_text) {
+            const trans_el = document.getElementById(`trans-${lang_code}`);
+            if (trans_el) {
+              trans_el.textContent = payload.translated_text;
+              trans_el.className = 'translation-text streaming';
+            }
+          }
+
+          if (payload.latency_ms) {
+            document.getElementById(`lat-val-${lang_code}`).textContent = `${Math.round(payload.latency_ms)}ms`;
+            document.getElementById('global-latency').textContent = `${Math.round(payload.latency_ms)}ms`;
+          }
+          return;
+        }
+
+        if (payload.type === 'stream_complete') {
+          document.getElementById(`card-${lang_code}`)?.classList.remove('streaming');
+          if (payload.translated_text) {
+            const trans_el = document.getElementById(`trans-${lang_code}`);
+            if (trans_el) {
+              trans_el.textContent = payload.translated_text;
+              trans_el.className = 'translation-text';
+            }
+          }
+          if (payload.is_final) {
+            state.utterance_count++;
+            document.getElementById('m-utt').textContent = state.utterance_count;
+            document.getElementById('m-total').textContent = `${Math.round(payload.latency_ms)}ms`;
+          }
+          return;
+        }
+
+        if (payload.translated_text && !payload.type) {
+          const trans_el = document.getElementById(`trans-${lang_code}`);
+          if (trans_el) {
+            trans_el.textContent = payload.translated_text;
+            trans_el.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
+          }
+          if (payload.is_final) {
+            state.utterance_count++;
+            document.getElementById('m-utt').textContent = state.utterance_count;
+            document.getElementById('m-total').textContent = `${Math.round(payload.latency_ms)}ms`;
+          }
+          if (payload.audio_b64 && payload.is_final) {
+            const audio_data = base64_to_arraybuffer(payload.audio_b64);
+            schedule_audio_chunk(lang_code, audio_data);
+          }
+        }
+      };
+
+      ws.onerror = () => log(`Listener error (${lang_code})`, 'err');
+
+      ws.onclose = () => {
+        delete state.listener_ws_map[lang_code];
+        if (state.listener_audio_contexts[lang_code]) {
+          state.listener_audio_contexts[lang_code].ctx.close();
+          delete state.listener_audio_contexts[lang_code];
+        }
+        document.getElementById(`btn-${lang_code}`)?.classList.remove('listening');
+        document.getElementById(`dot-${lang_code}`)?.classList.remove('active');
+        document.getElementById(`card-${lang_code}`)?.classList.remove('active', 'streaming');
+        log(`Channel ${lang_code} closed`, 'info');
+      };
     }
 
-    // Legacy batch payload
-    if (payload.translated_text && !payload.type) {
-      const trans_el = document.getElementById(`trans-${lang_code}`);
-      if (trans_el) {
-        trans_el.textContent = payload.translated_text;
-        trans_el.className = `translation-text ${payload.is_final ? '' : 'partial'}`;
-      }
-      if (payload.is_final) {
-        state.utterance_count++;
-        document.getElementById('m-utt').textContent = state.utterance_count;
-        document.getElementById('m-total').textContent = `${Math.round(payload.latency_ms)}ms`;
-      }
-      if (payload.audio_b64 && payload.is_final) {
-        const audio_data = base64_to_arraybuffer(payload.audio_b64);
-        schedule_audio_chunk(lang_code, audio_data);
-      }
-    }
-  };
+    // ─────────────────────────────────────────────────────────────────────────────
+    // BOOTSTRAP
+    // ─────────────────────────────────────────────────────────────────────────────
 
-  ws.onerror = () => log(`❌ Listener error (${lang_code})`, 'err');
-
-  ws.onclose = () => {
-    delete state.listener_ws_map[lang_code];
-    if (state.listener_audio_contexts[lang_code]) {
-      state.listener_audio_contexts[lang_code].ctx.close();
-      delete state.listener_audio_contexts[lang_code];
-    }
-    document.getElementById(`btn-${lang_code}`)?.classList.remove('listening');
-    document.getElementById(`dot-${lang_code}`)?.classList.remove('active');
-    document.getElementById(`card-${lang_code}`)?.classList.remove('active', 'streaming');
-    log(`🔌 Channel ${lang_code} closed`, 'info');
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOTSTRAP
-// ─────────────────────────────────────────────────────────────────────────────
-
-check_health();
-load_languages();
-setInterval(check_health, 5000);
-</script>
+    check_health();
+    load_languages();
+    setInterval(check_health, 5000);
+  </script>
 </body>
+
 </html>

@@ -56,7 +56,7 @@ class SonioxSTTClient:
             )
         return self._session
 
-    async def _connect(self) -> aiohttp.ClientWebSocketResponse:
+    async def _connect(self, language_code: Optional[str] = None) -> aiohttp.ClientWebSocketResponse:
         """Open a new WebSocket connection to Soniox."""
         session = await self._ensure_session()
         try:
@@ -68,7 +68,6 @@ class SonioxSTTClient:
             )
             log.info("soniox_ws_connected", ws_closed=ws.closed)
             
-            # Send config frame - Soniox expects a specific JSON format
             config = {
                 "api_key": self._cfg.api_key,
                 "model": self._cfg.model,
@@ -78,8 +77,19 @@ class SonioxSTTClient:
                 "include_nonfinal": self._cfg.include_nonfinal,
                 "enable_endpoint_detection": True,
             }
+            
+            # If AUTO-DETECT (None/empty) is selected, send ALL supported languages for identification.
+            # Otherwise, force a single language. 
+            if not language_code and not self._cfg.language_code:
+                # Use the full list from .env / config.yaml for true auto-detection
+                config["language_codes"] = cfg.apis.soniox.supported_languages if hasattr(cfg.apis.soniox, 'supported_languages') else ["en", "ta", "ml", "te", "kn", "hi"]
+            else:
+                target_lang = language_code or self._cfg.language_code or cfg.source.language_code
+                if target_lang:
+                    config["language_code"] = target_lang
+            
             config_json = json.dumps(config)
-            log.info("soniox_config_json", json_str=config_json[:200])
+            log.info("soniox_config_payload", payload=config)
             await ws.send_str(config_json)
             log.info("soniox_config_sent", config_keys=list(config.keys()), model=self._cfg.model)
             
@@ -103,6 +113,7 @@ class SonioxSTTClient:
     async def transcribe_stream(
         self,
         audio_chunks: AsyncGenerator[bytes, None],
+        language_code: Optional[str] = None,
     ) -> AsyncGenerator[Transcript, None]:
         """
         Feed audio chunks into a Soniox WebSocket session.
@@ -110,7 +121,7 @@ class SonioxSTTClient:
         """
         for attempt in range(cfg.pipeline.retry_attempts + 1):
             try:
-                async for transcript in self._run_session(audio_chunks):
+                async for transcript in self._run_session(audio_chunks, language_code):
                     yield transcript
                 return
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
@@ -122,8 +133,9 @@ class SonioxSTTClient:
     async def _run_session(
         self,
         audio_chunks: AsyncGenerator[bytes, None],
+        language_code: Optional[str] = None,
     ) -> AsyncGenerator[Transcript, None]:
-        ws = await self._connect()
+        ws = await self._connect(language_code)
         send_start = time.perf_counter()
         chunks_sent = 0
 
