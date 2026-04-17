@@ -104,8 +104,9 @@ async def run_test(args: argparse.Namespace) -> None:
             tts_ms = (time.perf_counter() - t_tts) * 1000
             print(f"  TTS: {tts_ms:.0f}ms  ({len(tts_results)} languages)")
 
+            audio_ext = ".pcm" if cfg.apis.elevenlabs.output_format.startswith("pcm_") else ".mp3"
             for r in tts_results:
-                fname = output_dir / f"utt{utt_id}_{r.lang_code}.mp3"
+                fname = output_dir / f"utt{utt_id}_{r.lang_code}{audio_ext}"
                 fname.write_bytes(r.audio_bytes)
                 print(f"    Saved: {fname} ({len(r.audio_bytes):,} bytes)")
 

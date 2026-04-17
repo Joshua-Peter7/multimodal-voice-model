@@ -11,11 +11,15 @@ import uvicorn
 from src.api.server import app
 from src.config_loader import cfg
 from src.logger import get_logger
+from src.metrics import start_metrics_server
 
 log = get_logger(__name__)
 
 
 def main() -> None:
+    # Start Prometheus metrics server
+    start_metrics_server()
+
     log.info(
         "starting_server",
         host=cfg.server.host,
@@ -25,18 +29,23 @@ def main() -> None:
 
     event_loop = "asyncio" if platform.system() == "Windows" else "uvloop"
 
-    uvicorn.run(
-        "src.api.server:app",
-        host=cfg.server.host,
-        port=cfg.server.port,
-        reload=False,
-        log_level=cfg.logging.level.lower(),
-        ws_ping_interval=cfg.server.ping_interval_seconds,
-        ws_ping_timeout=cfg.server.ping_timeout_seconds,
-        loop=event_loop,     # uvloop is not available on Windows
-        http="httptools",    # Fast HTTP parser
-        workers=1,           # WebSocket state must stay in single process; use Redis for scaling
-    )
+    try:
+        uvicorn.run(
+            "src.api.server:app",
+            host=cfg.server.host,
+            port=cfg.server.port,
+            reload=False,
+            log_level=cfg.logging.level.lower(),
+            ws_ping_interval=cfg.server.ping_interval_seconds,
+            ws_ping_timeout=cfg.server.ping_timeout_seconds,
+            loop=event_loop,
+            http="httptools",
+            workers=1,
+        )
+    except Exception as e:
+        import traceback
+        print(f"FATAL SERVER ERROR: {e}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

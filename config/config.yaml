@@ -6,11 +6,10 @@ apis:
     output_format: pcm_16000
     stream_chunk_size: 512
     use_websocket: true
-    ws_url: wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input?model_id=eleven_turbo_v2_5&output_format=pcm_16000
   groq:
     api_key: ${GROQ_API_KEY}
     base_url: https://api.groq.com/openai/v1
-    max_tokens: 512
+    max_tokens: 1024
     model_id: llama-3.3-70b-versatile
     temperature: 0.05
     timeout_seconds: 5
@@ -21,6 +20,8 @@ apis:
     model: stt-rt-v4
     num_audio_channels: 1
     sample_rate: 16000
+    supported_languages: ["en", "ta", "ml", "te", "kn", "hi"]
+    ws_url: wss://stt-rt.soniox.com/transcribe-websocket
 audio:
   bit_depth: 16
   bypass_vad: true
@@ -38,7 +39,7 @@ audio:
     speech_threshold_ms: 100
 languages:
 - code: ta
-  enabled: true
+  enabled: false
   name: Tamil
   similarity_boost: 0.75
   stability: 0.5
@@ -50,25 +51,25 @@ languages:
   stability: 0.5
   voice_id: ${EL_VOICE_EN}
 - code: ml
-  enabled: true
+  enabled: false
   name: Malayalam
   similarity_boost: 0.75
   stability: 0.5
   voice_id: ${EL_VOICE_ML}
 - code: te
-  enabled: true
+  enabled: false
   name: Telugu
   similarity_boost: 0.75
   stability: 0.5
   voice_id: ${EL_VOICE_TE}
 - code: kn
-  enabled: true
+  enabled: false
   name: Kannada
   similarity_boost: 0.75
   stability: 0.5
   voice_id: ${EL_VOICE_KN}
 - code: hi
-  enabled: true
+  enabled: false
   name: Hindi
   similarity_boost: 0.75
   stability: 0.5
@@ -100,6 +101,7 @@ metrics:
   collect_interval_seconds: 10
   enabled: true
   prometheus_port: 9090
+  latency_buckets: [50, 100, 200, 500, 1000, 2000, 5000]
 moderation:
   blocked_words: []
   enabled: true
@@ -125,6 +127,8 @@ redis:
   max_connections: 20
   password: ${REDIS_PASSWORD}
   port: 6379
+  cache_ttl_seconds: 3600
+  speaker_lock_ttl_seconds: 60
 server:
   cors_origins:
   - '*'

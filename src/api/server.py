@@ -27,6 +27,8 @@ from src.config_loader import cfg
 from src.logger import get_logger
 from src.pipeline.orchestrator import TranslationPipeline
 from src.streaming.channel_manager import ChannelManager
+from src.metrics import speaker_connected
+from src.redis_client import close_redis, get_redis
 
 log = get_logger(__name__)
 
@@ -55,6 +57,7 @@ async def lifespan(app: FastAPI):
 
     log.info("server_shutting_down")
     await _channel_manager.shutdown()
+    await close_redis()
 
 
 # ── App Setup ────────────────────────────────────────────────
@@ -158,8 +161,29 @@ async def speaker_ws(websocket: WebSocket, src_lang: Optional[str] = Query(None)
             pass
         return
 
+    # Try to acquire global speaker lock in Redis
+    redis = await get_redis()
+    if redis:
+        locked = await redis.set("speaker_lock", session_id, ex=cfg.redis.speaker_lock_ttl_seconds, nx=True)
+        if not locked:
+            current_owner = await redis.get("speaker_lock")
+            if current_owner and current_owner.decode() != session_id:
+                log.warning("speaker_lock_collision", owner=current_owner.decode())
+                await websocket.close(code=1008, reason="Another speaker is currently active")
+                return
+
     _active_speaker = session_id
+    speaker_connected.set(1)
     log.info("speaker_connected", session=session_id, src_lang=src_lang)
+    
+    # Start lock heartbeat
+    async def _lock_heartbeat():
+        while _active_speaker == session_id:
+            if redis:
+                await redis.expire("speaker_lock", cfg.redis.speaker_lock_ttl_seconds)
+            await asyncio.sleep(cfg.server.ping_interval_seconds / 2)
+    
+    heartbeat_task = asyncio.create_task(_lock_heartbeat())
     
     try:
         await websocket.send_text(json.dumps({
@@ -205,7 +229,7 @@ async def speaker_ws(websocket: WebSocket, src_lang: Optional[str] = Query(None)
         try:
             log.info("pipeline_task_starting", session=session_id, src_lang=src_lang)
             async for transcript in pipeline.run(_ws_audio_source(), source_lang=src_lang):
-                log.info("transcript_received", session=session_id, text=transcript.text[:50])
+                log.info("transcript_received", session=session_id, text=transcript.text[:50] if cfg.logging.log_transcripts else "[REDACTED]")
                 try:
                     await websocket.send_text(json.dumps({
                         "type": "transcript",
@@ -238,6 +262,10 @@ async def speaker_ws(websocket: WebSocket, src_lang: Optional[str] = Query(None)
                 timeout=cfg.server.ping_timeout_seconds,
             )
 
+            if msg.get("type") == "websocket.disconnect":
+                log.info("speaker_disconnected", session=session_id, code=msg.get("code"))
+                break
+
             if "bytes" in msg and msg["bytes"]:
                 chunk_size = len(msg["bytes"])
                 audio_chunk_count += 1
@@ -267,11 +295,24 @@ async def speaker_ws(websocket: WebSocket, src_lang: Optional[str] = Query(None)
 
     except (WebSocketDisconnect, asyncio.TimeoutError):
         log.info("speaker_disconnected", session=session_id)
+    except RuntimeError as exc:
+        if "disconnect message has been received" in str(exc):
+            log.info("speaker_disconnected", session=session_id, reason="receive_after_disconnect")
+        else:
+            raise
     finally:
         await audio_queue.put(b"__END__")
         pipe_task.cancel()
         await pipeline.close()
+        heartbeat_task.cancel()
         _active_speaker = None
+        speaker_connected.set(0)
+        
+        # Release global lock
+        if redis:
+            current_owner = await redis.get("speaker_lock")
+            if current_owner and current_owner.decode() == session_id:
+                await redis.delete("speaker_lock")
 
         # Send final stats back
         try:

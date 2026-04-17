@@ -18,7 +18,7 @@ from src.logger import get_logger, log_latency
 
 log = get_logger(__name__)
 
-SONIOX_WS_URL = "wss://stt-rt.soniox.com/transcribe-websocket"
+
 
 
 @dataclass
@@ -28,6 +28,7 @@ class Transcript:
     confidence: float
     latency_ms: float
     words: list[dict]
+    language_code: Optional[str] = None
 
 
 class SonioxSTTClient:
@@ -62,8 +63,8 @@ class SonioxSTTClient:
         try:
             log.info("soniox_connecting", api_key_set=bool(self._cfg.api_key))
             ws = await session.ws_connect(
-                SONIOX_WS_URL,
-                heartbeat=20,
+                self._cfg.ws_url or "wss://stt-rt.soniox.com/transcribe-websocket",
+                heartbeat=cfg.server.ping_interval_seconds,
                 max_msg_size=0,
             )
             log.info("soniox_ws_connected", ws_closed=ws.closed)
@@ -82,7 +83,7 @@ class SonioxSTTClient:
             # Otherwise, force a single language. 
             if not language_code and not self._cfg.language_code:
                 # Use the full list from .env / config.yaml for true auto-detection
-                config["language_codes"] = cfg.apis.soniox.supported_languages if hasattr(cfg.apis.soniox, 'supported_languages') else ["en", "ta", "ml", "te", "kn", "hi"]
+                config["language_codes"] = self._cfg.supported_languages or ["en", "ta", "ml", "te", "kn", "hi"]
             else:
                 target_lang = language_code or self._cfg.language_code or cfg.source.language_code
                 if target_lang:
@@ -202,6 +203,7 @@ class SonioxSTTClient:
                             confidence=1.0,
                             latency_ms=latency,
                             words=final_tokens + non_final_tokens,
+                            language_code=data.get("language_code"),
                         )
 
                         yield transcript

@@ -33,6 +33,8 @@ class SonioxConfig:
     include_nonfinal: bool
     max_alternatives: int
     language_code: Optional[str] = None
+    supported_languages: List[str] = field(default_factory=list)
+    ws_url: str = ""
 
 
 @dataclass
@@ -53,7 +55,6 @@ class ElevenLabsConfig:
     optimize_streaming_latency: int
     stream_chunk_size: int
     use_websocket: bool
-    ws_url: str
 
 
 @dataclass
@@ -150,6 +151,8 @@ class RedisConfig:
     password: str
     channel_prefix: str
     max_connections: int
+    cache_ttl_seconds: int = 3600
+    speaker_lock_ttl_seconds: int = 60
 
 
 @dataclass
@@ -165,6 +168,7 @@ class MetricsConfig:
     enabled: bool
     prometheus_port: int
     collect_interval_seconds: int
+    latency_buckets: List[float] = field(default_factory=list)
 
 
 @dataclass

@@ -18,6 +18,7 @@ import aiohttp
 
 from src.config_loader import cfg, LanguageConfig
 from src.logger import get_logger, log_latency
+from src.redis_client import get_redis
 
 log = get_logger(__name__)
 
@@ -39,40 +40,17 @@ class TranslationResult:
 
 
 _SYSTEM_PROMPT = """\
-You are a professional real-time translator. Your task is to translate the given text into all requested target languages simultaneously.
-
-Rules:
-- Return ONLY a valid JSON object, no preamble, no explanation, no markdown fences
-- Keys are ISO 639-1 language codes
-- Values are accurate, natural-sounding translations
-- Preserve tone, formality, and speaking style
-- For code-mixed input (e.g. Hinglish), translate intent naturally
-- If a language cannot be translated, use an empty string as value
+Translate the input text into ALL requested target languages.
+Return ONLY a raw JSON object where keys are ISO codes and values are the translations.
+Absolutely no preamble, no markdown formatting, and no extra text.
 """
 
 
 def _build_user_prompt(source_text: str, languages: List[LanguageConfig], source_lang: Optional[str] = None) -> str:
-    lang_list = ", ".join(f"{lang.name} ({lang.code})" for lang in languages)
-    response_shape = ", ".join(f'"{lang.code}": "..."' for lang in languages)
-    
-    # Resolve source language name if possible, else use auto-detection hint
-    src_hint = "detect language automatically"
-    if source_lang:
-        # Find the name from config or common mapping
-        for l in cfg.languages:
-            if l.code == source_lang:
-                src_hint = l.name
-                break
-        else:
-            # Fallback for common codes
-            mapping = {"en": "English", "ta": "Tamil", "ml": "Malayalam", "te": "Telugu", "kn": "Kannada", "hi": "Hindi"}
-            src_hint = mapping.get(source_lang, "the source language")
-            
-    return (
-        f'Translate the following text ({src_hint}) into: {lang_list}.\n\n'
-        f'Text: "{source_text}"\n\n'
-        f"Respond only with JSON: {{{response_shape}}}"
-    )
+    lang_info = ", ".join(f"{l.code} ({l.name})" for l in languages)
+    return f"Source hint: {source_lang or 'auto-detect'}\n" \
+           f"Target languages: {lang_info}\n" \
+           f"Input text: {source_text}"
 
 
 def _parse_json_from_response(raw: str) -> Optional[Dict[str, str]]:
@@ -161,18 +139,37 @@ class LLMTranslator:
         if not target_langs:
             return TranslationResult({}, source_text, 0.0, self._cfg.model_id)
 
-        # ── Cache check (for repeated speculative translations) ──
+        # ── 1. Local Cache check ──
         cache_key = source_text.strip().lower()
         if cache_key in _translation_cache:
-            cached = _translation_cache[cache_key]
-            log.debug("translation_cache_hit", text=source_text[:30])
-            return cached
+            log.debug("translation_local_cache_hit", text=source_text[:30])
+            return _translation_cache[cache_key]
+
+        # ── 2. Redis Cache check ──
+        redis = await get_redis()
+        if redis:
+            try:
+                # Use a 500ms timeout for Redis lookups - don't let cache hang the pipeline
+                res_data = await asyncio.wait_for(redis.get(f"trans:{cache_key}"), timeout=0.5)
+                if res_data:
+                    data = json.loads(res_data)
+                    result = TranslationResult(
+                        translations=data["translations"],
+                        source_text=source_text,
+                        latency_ms=data["latency_ms"],
+                        model_used=data["model_used"]
+                    )
+                    _translation_cache[cache_key] = result # Update local cache
+                    log.info("translation_redis_cache_hit", text=source_text[:30])
+                    return result
+            except (asyncio.TimeoutError, Exception) as e:
+                log.debug("translation_cache_skip", reason=str(e))
 
         # ── Dedup: if identical request is in-flight, await it ──
         if cache_key in self._inflight:
             log.debug("translation_dedup", text=source_text[:30])
             try:
-                return await self._inflight[cache_key]
+                return await asyncio.shield(self._inflight[cache_key])
             except Exception:
                 pass  # Fall through to make a new request
 
@@ -181,7 +178,12 @@ class LLMTranslator:
         self._inflight[cache_key] = task
 
         try:
-            return await task
+            # Wait for the task with a timeout 20% longer than the API timeout
+            return await asyncio.wait_for(task, timeout=self._cfg.timeout_seconds + 1.0)
+        except asyncio.TimeoutError:
+            log.error("translation_timeout", text=source_text[:30])
+            task.cancel()
+            raise Exception("Translation timed out")
         finally:
             self._inflight.pop(cache_key, None)
 
@@ -222,7 +224,11 @@ class LLMTranslator:
                         await asyncio.sleep(min(retry_after, 2.0))
                         continue
 
-                    resp.raise_for_status()
+                    if not resp.ok:
+                        body = await resp.text()
+                        log.error("groq_api_error", status=resp.status, body=body, attempt=attempt)
+                        continue
+                    
                     body = await resp.json()
 
                     # Groq returns OpenAI-compatible response
@@ -267,6 +273,27 @@ class LLMTranslator:
                         for k in keys[:_CACHE_MAX_SIZE // 2]:
                             _translation_cache.pop(k, None)
                     _translation_cache[cache_key] = result
+                    
+                    # ── 5. Store in Redis for other nodes ──
+                    redis = await get_redis()
+                    if redis:
+                        try:
+                            # Cache for configured duration with timeout
+                            await asyncio.wait_for(
+                                redis.setex(
+                                    f"trans:{cache_key}",
+                                    cfg.redis.cache_ttl_seconds,
+                                    json.dumps({
+                                        "translations": translations,
+                                        "latency_ms": latency_ms,
+                                        "model_id": self._cfg.model_id,
+                                        "source_text": source_text,
+                                    })
+                                ),
+                                timeout=1.0
+                            )
+                        except Exception:
+                            pass
 
                     return result
 

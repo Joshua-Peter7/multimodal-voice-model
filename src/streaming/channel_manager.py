@@ -20,12 +20,12 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Dict, Optional, Set
 
-import redis.asyncio as aioredis
+from src.redis_client import get_redis
 from fastapi import WebSocket
 
 from src.config_loader import cfg
 from src.logger import get_logger
-from src.tts.elevenlabs_client import TTSResult
+from src.metrics import active_listeners
 
 log = get_logger(__name__)
 
@@ -58,6 +58,14 @@ class StreamChunkPayload:
     timestamp: float
 
 
+@dataclass
+class ErrorPayload:
+    type: str
+    lang_code: str
+    message: str
+    timestamp: float
+
+
 class ChannelManager:
     """
     Manages WebSocket subscriber connections per language channel.
@@ -78,34 +86,24 @@ class ChannelManager:
         self._send_lock = asyncio.Lock()
 
     async def startup(self) -> None:
-        """Connect to Redis and start the subscriber listener."""
+        """Initialize Redis pubsub connection for cross-node broadcasting."""
         channels = [f"{self._prefix}:{lang.code}" for lang in cfg.enabled_languages]
-        if not self._cfg.host:
-            log.warning("redis_disabled_missing_host")
-            return
-
-        try:
-            pool = aioredis.ConnectionPool.from_url(
-                f"redis://{self._cfg.host}:{self._cfg.port}/{self._cfg.db}",
-                password=self._cfg.password or None,
-                max_connections=self._cfg.max_connections,
-                decode_responses=False,
-            )
-            self._redis = aioredis.Redis(connection_pool=pool)
-            await self._redis.ping()
-
-            self._pubsub = self._redis.pubsub()
-            if channels:
-                await self._pubsub.subscribe(*channels)
-
-            self._listener_task = asyncio.create_task(self._redis_listener())
-            self._redis_enabled = True
-            log.info("channel_manager_started", channels=channels, mode="redis")
-        except Exception as exc:
-            self._redis = None
-            self._pubsub = None
-            self._redis_enabled = False
-            log.warning("redis_unavailable_falling_back_to_memory", error=str(exc))
+        
+        self._redis = await get_redis()
+        if self._redis:
+            try:
+                self._pubsub = self._redis.pubsub()
+                if channels:
+                    await self._pubsub.subscribe(*channels)
+                
+                self._listener_task = asyncio.create_task(self._redis_listener())
+                self._redis_enabled = True
+                log.info("channel_manager_redis_subscribed", channels=channels)
+            except Exception as exc:
+                log.warning("channel_manager_redis_init_failed", error=str(exc))
+                self._redis_enabled = False
+        else:
+            log.warning("channel_manager_memory_mode_only")
 
     async def shutdown(self) -> None:
         if self._listener_task:
@@ -113,18 +111,19 @@ class ChannelManager:
         if self._pubsub:
             await self._pubsub.unsubscribe()
             await self._pubsub.close()
-        if self._redis:
-            await self._redis.aclose()
+        # Redis connection is shared and closed by the app lifespan
         log.info("channel_manager_stopped")
 
     async def subscribe(self, ws: WebSocket, lang_code: str) -> None:
         """Register a WebSocket as a listener on a language channel."""
         self._subscribers[lang_code].add(ws)
+        active_listeners.labels(lang_code=lang_code).set(len(self._subscribers[lang_code]))
         log.info("listener_subscribed", lang=lang_code, count=len(self._subscribers[lang_code]))
 
     async def unsubscribe(self, ws: WebSocket, lang_code: str) -> None:
         """Remove a WebSocket from a language channel."""
         self._subscribers[lang_code].discard(ws)
+        active_listeners.labels(lang_code=lang_code).set(len(self._subscribers[lang_code]))
         log.info("listener_unsubscribed", lang=lang_code, count=len(self._subscribers[lang_code]))
 
     # ── Streaming Chunk Broadcasting (Low Latency) ───────────────
@@ -240,6 +239,27 @@ class ChannelManager:
         if ws_set:
             tasks = [self._safe_send(ws, encoded, lang_code) for ws in list(ws_set)]
             await asyncio.gather(*tasks)
+
+    async def publish_error(self, lang_code: str, message: str) -> None:
+        """Broadcast a non-audio error to listeners of one language channel."""
+        payload = ErrorPayload(
+            type="error",
+            lang_code=lang_code,
+            message=message,
+            timestamp=time.time(),
+        )
+        encoded = json.dumps(asdict(payload)).encode()
+
+        ws_set = self._subscribers.get(lang_code, set())
+        if ws_set:
+            tasks = [self._safe_send(ws, encoded, lang_code) for ws in list(ws_set)]
+            await asyncio.gather(*tasks)
+
+        if self._redis_enabled and self._redis:
+            try:
+                await self._redis.publish(f"{self._prefix}:{lang_code}", encoded)
+            except Exception:
+                pass
 
     # ── Batch Broadcasting (Legacy / Fallback) ───────────────────
 

@@ -1,23 +1,22 @@
 """
-pipeline/orchestrator.py — Ultra-low-latency streaming pipeline.
+pipeline/orchestrator.py - Ultra-low-latency streaming pipeline.
 
-Architecture for ~60ms perceived latency:
-1. Audio streams directly to Soniox (bypass VAD)
-2. Partial transcripts trigger speculative translation via Groq (~40ms)
-3. Translations stream to ElevenLabs WebSocket TTS (~30ms first chunk)
+Architecture for low perceived latency:
+1. Audio streams directly to Soniox (optionally bypassing VAD)
+2. Partial transcripts can trigger speculative translation
+3. Translations stream to ElevenLabs TTS
 4. Audio chunks broadcast to listeners as they arrive
 
 Key optimizations:
-- Bypass VAD → Soniox handles endpointing natively
-- Groq API → 30-60ms vs 2-15s on HuggingFace
-- ElevenLabs WebSocket → 30ms first chunk vs 300ms HTTP
-- Pipeline overlap → translation + TTS start on partial transcripts
-- Request deduplication → avoid redundant API calls on overlapping partials
+- Bypass VAD so Soniox handles endpointing natively
+- Pipeline overlap so translation and TTS can begin on partials
+- Request deduplication to avoid redundant work on overlapping partials
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import dataclass, field
 from typing import AsyncGenerator, Dict, Optional
@@ -26,14 +25,16 @@ from src.audio.ingestion import AudioIngestion
 from src.audio.vad import VADProcessor
 from src.config_loader import cfg
 from src.logger import get_logger
+from src.metrics import pipeline_errors_total, record_pipeline
 from src.moderation.content_moderator import ContentModerator
 from src.stt.soniox_client import SonioxSTTClient, Transcript
-from src.stt.mock_client import MockSTTClient
 from src.streaming.channel_manager import ChannelManager
-from src.translation.llm_translator import LLMTranslator, TranslationResult
-from src.tts.elevenlabs_client import ElevenLabsTTSClient, TTSChunk
+from src.translation.llm_translator import LLMTranslator
+from src.tts.elevenlabs_client import ElevenLabsTTSClient
 
 log = get_logger(__name__)
+
+_MIN_PARTIAL_ADVANCE_CHARS = 12
 
 
 @dataclass
@@ -58,6 +59,7 @@ class PipelineStats:
 @dataclass
 class UtteranceContext:
     """Tracks state for one utterance through the pipeline."""
+
     utterance_id: str
     started_at: float = field(default_factory=time.perf_counter)
     last_partial: str = ""
@@ -67,23 +69,24 @@ class UtteranceContext:
     source_lang: Optional[str] = None
 
 
+def _normalize_source_text(text: str) -> str:
+    """Normalize Soniox transcript text before dedup and translation."""
+    text = re.sub(r"<\w+>?", ". ", text).strip()
+    text = re.sub(r"\s+\.", ".", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
 class TranslationPipeline:
     """
     Full end-to-end streaming pipeline orchestrator.
     One instance per speaker WebSocket session.
-
-    Pipeline flow:
-      Audio → [optional VAD] → Soniox STT → Groq Translation → ElevenLabs TTS → Broadcast
-                                     ↓ (partials)
-                               Speculative Translation → Pre-warm TTS
     """
 
     def __init__(self, channel_manager: ChannelManager) -> None:
         self._cfg_p = cfg.pipeline
         self._ingestion = AudioIngestion()
         self._vad = VADProcessor()
-        # Use real Soniox STT client
-        # self._stt = MockSTTClient()
         self._stt = SonioxSTTClient()
         self._translator = LLMTranslator()
         self._moderator = ContentModerator()
@@ -93,31 +96,24 @@ class TranslationPipeline:
         self._utterance_counter = 0
         self._active_context: Optional[UtteranceContext] = None
 
-    # ── Public API ──────────────────────────────────────────────
-
     async def run(
-        self, 
+        self,
         audio_source: AsyncGenerator[bytes, None],
-        source_lang: Optional[str] = None
+        source_lang: Optional[str] = None,
     ) -> AsyncGenerator[Transcript, None]:
         """
-        Main run loop — consumes streaming audio and drives the entire pipeline.
-        Call this as a background task for each speaker session.
+        Main run loop. Consumes streaming audio and drives the entire pipeline.
         """
         self._audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=500)
 
         async def _audio_producer() -> None:
             async for chunk in audio_source:
                 if cfg.audio.bypass_vad:
-                    # Direct pass-through — no noise suppression, no chunking
-                    # Minimizes latency by streaming raw audio to STT
                     await self._audio_queue.put(chunk)
                 else:
-                    # Process through ingestion (noise suppression + chunking)
                     processed = self._ingestion.ingest(chunk)
-                    for c in processed:
-                        await self._audio_queue.put(c)
-            # Signal end
+                    for processed_chunk in processed:
+                        await self._audio_queue.put(processed_chunk)
             await self._audio_queue.put(b"")
 
         producer_task = asyncio.create_task(_audio_producer())
@@ -130,22 +126,20 @@ class TranslationPipeline:
                 yield chunk
 
         if cfg.audio.bypass_vad:
-            # Stream directly to STT — Soniox handles endpointing
             async for transcript in self._run_stt_direct(_queue_reader(), source_lang):
                 yield transcript
         else:
-            # Run VAD on the queue stream, then STT on VAD output
             async for transcript in self._run_stt_with_vad(_queue_reader(), source_lang):
                 yield transcript
 
         producer_task.cancel()
 
     async def _run_stt_direct(
-        self, 
+        self,
         audio_gen: AsyncGenerator[bytes, None],
-        source_lang: Optional[str] = None
+        source_lang: Optional[str] = None,
     ) -> AsyncGenerator[Transcript, None]:
-        """Stream audio directly to Soniox STT (bypass VAD for lowest latency)."""
+        """Stream audio directly to Soniox STT."""
         self._utterance_counter += 1
         ctx = UtteranceContext(utterance_id=f"utt-{self._utterance_counter}")
         ctx.source_lang = source_lang
@@ -154,20 +148,19 @@ class TranslationPipeline:
         async for transcript in self._stt.transcribe_stream(audio_gen, source_lang):
             await self._on_transcript(transcript, ctx)
 
-            # Start new context on final transcript (new utterance)
             if transcript.is_final:
                 self._utterance_counter += 1
                 ctx = UtteranceContext(utterance_id=f"utt-{self._utterance_counter}")
                 self._active_context = ctx
-            
+
             yield transcript
 
     async def _run_stt_with_vad(
-        self, 
+        self,
         audio_gen: AsyncGenerator[bytes, None],
-        source_lang: Optional[str] = None
+        source_lang: Optional[str] = None,
     ) -> AsyncGenerator[Transcript, None]:
-        """Run audio through VAD → Soniox STT → translation pipeline."""
+        """Run audio through VAD, then STT, then the translation pipeline."""
 
         async def _vad_output() -> AsyncGenerator[bytes, None]:
             async for utterance in self._vad.process_stream(audio_gen):
@@ -182,18 +175,17 @@ class TranslationPipeline:
             await self._on_transcript(transcript, ctx)
             yield transcript
 
-    async def _on_transcript(
-        self, transcript: Transcript, ctx: UtteranceContext
-    ) -> None:
+    async def _on_transcript(self, transcript: Transcript, ctx: UtteranceContext) -> None:
         """
         Called for every partial/final transcript from Soniox.
-        Implements aggressive speculative translation on partials.
         """
+        if transcript.language_code:
+            ctx.source_lang = transcript.language_code
+
         text = transcript.text.strip()
         if not text:
             return
 
-        # Screen source text
         try:
             mod_result = self._moderator.screen(text)
             text = mod_result.text
@@ -201,116 +193,116 @@ class TranslationPipeline:
             log.warning("source_content_blocked", utt=ctx.utterance_id)
             return
 
+        text = _normalize_source_text(text)
+        if not text:
+            return
+
         if transcript.is_final:
-            # Cancel any pending speculative task
             if ctx.speculative_task and not ctx.speculative_task.done():
                 ctx.speculative_task.cancel()
 
             log.info(
                 "final_transcript",
-                text=text,
+                text=text if cfg.logging.log_transcripts else "[REDACTED]",
                 stt_latency_ms=round(transcript.latency_ms, 1),
             )
             self._stats.stt_latency_ms = transcript.latency_ms
 
-            # Process final transcript with streaming TTS
+            if self._cfg_p.final_confirm_delay_ms > 0:
+                await asyncio.sleep(self._cfg_p.final_confirm_delay_ms / 1000)
+
             await self._translate_and_stream(text, ctx, is_final=True)
             ctx.final_processed = True
+            return
 
-        elif self._cfg_p.speculative_translation:
-            # Speculative translation on partials — more aggressive thresholds
-            if (
-                len(text) >= self._cfg_p.partial_min_chars
-                and text != ctx.last_partial
-            ):
-                ctx.last_partial = text
-                # Cancel previous speculative task
-                if ctx.speculative_task and not ctx.speculative_task.done():
-                    ctx.speculative_task.cancel()
-                ctx.speculative_task = asyncio.create_task(
-                    self._speculative_translate(text, ctx)
-                )
+        if not self._cfg_p.speculative_translation:
+            return
+        if len(text) < self._cfg_p.partial_min_chars:
+            return
+        if text == ctx.last_partial:
+            return
+        if (
+            ctx.last_partial
+            and text.startswith(ctx.last_partial)
+            and (len(text) - len(ctx.last_partial)) < _MIN_PARTIAL_ADVANCE_CHARS
+        ):
+            log.debug(
+                "speculative_skip_small_increment",
+                utterance=ctx.utterance_id,
+                prev_len=len(ctx.last_partial),
+                new_len=len(text),
+            )
+            return
 
-    async def _speculative_translate(
-        self, text: str, ctx: UtteranceContext
-    ) -> None:
-        """
-        Translate a partial transcript speculatively.
-        Shorter delay than before since Groq is fast enough to handle
-        more frequent speculative calls.
-        """
-        await asyncio.sleep(self._cfg_p.speculative_interval_ms / 1000)
-        if ctx.final_processed:
-            return  # Final already handled, skip stale speculative
-        log.debug("speculative_translate", text=text[:50])
-        await self._translate_and_stream(text, ctx, is_final=False)
+        ctx.last_partial = text
+        if ctx.speculative_task and not ctx.speculative_task.done():
+            ctx.speculative_task.cancel()
+        ctx.speculative_task = asyncio.create_task(self._speculative_translate(text, ctx))
+
+    async def _speculative_translate(self, text: str, ctx: UtteranceContext) -> None:
+        """Translate a partial transcript speculatively."""
+        log.info("speculative_task_trigger", text=text[:30])
+        try:
+            await asyncio.sleep(self._cfg_p.speculative_interval_ms / 1000)
+            if ctx.final_processed:
+                log.debug("speculative_task_skipped_final_exists")
+                return
+            await self._translate_and_stream(text, ctx, is_final=False)
+        except asyncio.CancelledError:
+            log.debug("speculative_task_cancelled", utterance=ctx.utterance_id)
+            raise
 
     async def _translate_and_stream(
         self, text: str, ctx: UtteranceContext, is_final: bool
     ) -> None:
         """
-        Core pipeline: text -> Groq Streaming Translation -> ElevenLabs Streaming TTS -> Broadcast.
-        Streams audio chunks to all enabled languages in parallel.
+        Core pipeline: text -> translation -> parallel TTS streaming -> broadcast.
         """
         pipeline_start = time.perf_counter()
-        translations: Dict[str, str] = {}
-        translation_latency = 0.0
         moderation_flag = False
 
-        # Step 1: Translate to all languages (batch operation, not streaming)
+        text = _normalize_source_text(text)
+        if not text:
+            return
+
         try:
-            translation_start = time.perf_counter()
-            translation_result = await self._translator.translate(text, source_lang=ctx.source_lang)
-            translations = translation_result.translations
-            translation_latency = translation_result.latency_ms
-            moderation_flag = False  # Already screened in _on_transcript
-        except Exception as e:
-            log.error("translation_error", text=text[:50], error=str(e))
-            # Continue with empty translations if translation fails
-            for lang in cfg.enabled_languages:
-                translations[lang.code] = ""
+            log.info("translation_starting", text_len=len(text), is_final=is_final)
+            res = await self._translator.translate(text, source_lang=ctx.source_lang)
+            translations = res.translations
+            log.info("translation_received", count=len(translations), latency_ms=res.latency_ms)
+            if cfg.moderation.moderate_translations:
+                translations, moderation_flag = self._moderator.screen_translations(translations)
+            if not is_final and translations == ctx.last_translated:
+                log.debug("skip_duplicate_partial_translation", utterance=ctx.utterance_id)
+                return
+        except Exception as exc:
+            pipeline_errors_total.labels(stage="translation").inc()
+            log.error("translation_error", error=str(exc))
+            return
 
-        # Step 1.5: Broadcast translations immediately (UI update)
-        latency_so_far = (time.perf_counter() - pipeline_start) * 1000
-        broadcast_tasks = []
-        for lang_code, trans_text in translations.items():
-            if trans_text:
-                broadcast_tasks.append(
-                    self._channels.publish_translation_update(
-                        lang_code=lang_code,
-                        source_text=text,
-                        translated_text=trans_text,
-                        is_final=is_final,
-                        pipeline_latency_ms=latency_so_far
-                    )
-                )
-        if broadcast_tasks:
-            await asyncio.gather(*broadcast_tasks)
-
-        # Step 2: Stream TTS for each language in parallel
-        async def _process_language(lang):
+        async def _process_language(lang) -> None:
+            log.debug("language_pipeline_start", lang=lang.code, utterance=ctx.utterance_id)
             try:
-                chunk_counter = 0
-                # Use the translated text for this language
                 translated_text = translations.get(lang.code, "")
                 if not translated_text:
-                    log.debug("skip_tts_empty_translation", lang=lang.code)
                     return
 
-                # Stream TTS as string (not token stream)
-                async for chunk in self._tts.stream_one_ws(translated_text, lang):
-                    # Skip final markers and empty chunks, but process audio
+                await self._channels.publish_translation_update(
+                    lang_code=lang.code,
+                    source_text=text,
+                    translated_text=translated_text,
+                    is_final=is_final,
+                    pipeline_latency_ms=(time.perf_counter() - pipeline_start) * 1000,
+                )
+
+                chunk_counter = 0
+                async for chunk in self._tts.stream_one_chunked(translated_text, lang):
                     if not chunk.audio_chunk:
                         continue
 
                     latency = (time.perf_counter() - pipeline_start) * 1000
                     if chunk_counter == 0:
                         self._stats.tts_first_chunk_ms = latency
-                        log.info(
-                            "first_tts_chunk",
-                            lang=lang.code,
-                            latency_ms=round(latency, 1),
-                        )
 
                     await self._channels.publish_audio_chunk(
                         lang_code=chunk.lang_code,
@@ -324,44 +316,61 @@ class TranslationPipeline:
                     )
                     chunk_counter += 1
 
-                # Stream complete for this language
-                final_latency = (time.perf_counter() - pipeline_start) * 1000
                 await self._channels.publish_stream_complete(
                     lang_code=lang.code,
                     source_text=text,
                     translated_text=translated_text,
                     is_final=is_final,
-                    pipeline_latency_ms=final_latency,
+                    pipeline_latency_ms=(time.perf_counter() - pipeline_start) * 1000,
                     moderation_flag=moderation_flag,
                 )
+                log.debug("language_pipeline_complete", lang=lang.code, utterance=ctx.utterance_id)
 
-            except Exception as e:
-                log.error("language_pipeline_error", lang=lang.code, error=str(e))
+            except Exception as exc:
+                pipeline_errors_total.labels(stage="tts").inc()
+                await self._channels.publish_error(
+                    lang.code,
+                    f"TTS unavailable for {lang.name}: {str(exc)}",
+                )
+                log.error("language_pipeline_error", lang=lang.code, error=str(exc))
 
-        # Stream all languages in parallel
         target_langs = cfg.enabled_languages
-        if target_langs:
-            tasks = [_process_language(lang) for lang in target_langs]
-            await asyncio.gather(*tasks)
+        if self._cfg_p.parallel_lang_processing:
+            await asyncio.gather(*[_process_language(lang) for lang in target_langs])
+        else:
+            for lang in target_langs:
+                await _process_language(lang)
 
-        # Update stats
+        ctx.last_translated = dict(translations)
+
+        total_latency = (time.perf_counter() - pipeline_start) * 1000
         if is_final:
-            total_latency = (time.perf_counter() - pipeline_start) * 1000
             self._stats.total_utterances += 1
             self._stats.total_latency_ms += total_latency
-        else:
-            total_latency = (time.perf_counter() - pipeline_start) * 1000
+
+        record_pipeline(
+            total_ms=total_latency,
+            stt_ms=self._stats.stt_latency_ms,
+            translation_ms=0.0,
+            tts_ms=self._stats.tts_first_chunk_ms,
+            flagged=False,
+        )
 
         log.info(
             "pipeline_complete",
             utterance_id=ctx.utterance_id,
             is_final=is_final,
             total_latency_ms=round(total_latency, 1),
-            translation_latency_ms=round(translation_latency, 1),
-            tts_latency_ms=round(self._stats.tts_latency_ms, 1),
-            moderation_flag=moderation_flag,
+            tts_first_chunk_ms=round(self._stats.tts_first_chunk_ms, 1),
         )
 
+        if total_latency > self._cfg_p.target_latency_ms:
+            log.warning(
+                "latency_target_exceeded",
+                target_ms=self._cfg_p.target_latency_ms,
+                actual_ms=round(total_latency, 1),
+                utterance=ctx.utterance_id,
+            )
 
     async def close(self) -> None:
         """Clean up resources."""

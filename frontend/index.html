@@ -1292,6 +1292,12 @@
           return;
         }
 
+        if (payload.type === 'error') {
+          document.getElementById(`card-${lang_code}`)?.classList.remove('streaming');
+          log(`Audio error (${lang_code}): ${payload.message}`, 'err');
+          return;
+        }
+
         if (payload.type === 'audio_chunk' && payload.audio_b64) {
           document.getElementById(`card-${lang_code}`)?.classList.add('streaming');
           const audio_data = base64_to_arraybuffer(payload.audio_b64);

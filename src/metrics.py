@@ -13,29 +13,30 @@ from src.logger import get_logger
 log = get_logger(__name__)
 
 # ── Metric Definitions ───────────────────────────────────────
+buckets = cfg.metrics.latency_buckets or [100, 200, 500, 1000, 2000, 5000]
 
 pipeline_latency = Histogram(
     "translation_pipeline_latency_ms",
     "End-to-end pipeline latency in milliseconds",
-    buckets=[50, 100, 200, 500, 1000, 2000, 5000],
+    buckets=buckets,
 )
 
 stt_latency = Histogram(
     "stt_latency_ms",
     "Soniox STT latency per utterance",
-    buckets=[50, 100, 200, 500, 1000],
+    buckets=buckets,
 )
 
 translation_latency = Histogram(
     "llm_translation_latency_ms",
     "LLM translation latency per utterance",
-    buckets=[100, 300, 500, 1000, 2000, 5000],
+    buckets=buckets,
 )
 
 tts_latency = Histogram(
     "tts_synthesis_latency_ms",
     "ElevenLabs TTS latency per utterance",
-    buckets=[100, 200, 500, 1000, 2000],
+    buckets=buckets,
 )
 
 utterances_total = Counter(

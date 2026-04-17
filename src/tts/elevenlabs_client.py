@@ -25,6 +25,14 @@ log = get_logger(__name__)
 _EL_BASE_URL = "https://api.elevenlabs.io/v1"
 
 
+class TTSProviderError(RuntimeError):
+    """Non-transient TTS provider failure that callers should surface."""
+
+    def __init__(self, message: str, *, retryable: bool = True) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+
+
 @dataclass
 class TTSResult:
     lang_code: str
@@ -91,12 +99,14 @@ class ElevenLabsTTSClient:
         Yields TTSChunk objects as audio arrives (~30ms first chunk).
         Optionally calls on_chunk callback for each chunk.
         """
-        ws_url = (
-            f"wss://api.elevenlabs.io/v1/text-to-speech/{language.voice_id}"
-            f"/stream-input?model_id={self._cfg.model_id}"
-            f"&output_format={self._cfg.output_format}"
-            f"&optimize_streaming_latency={self._cfg.optimize_streaming_latency}"
-        )
+        # Construct dynamic WS URL
+        base_url = f"wss://api.elevenlabs.io/v1/text-to-speech/{language.voice_id}/stream-input"
+        params = {
+            "model_id": self._cfg.model_id,
+            "output_format": self._cfg.output_format,
+            "optimize_streaming_latency": self._cfg.optimize_streaming_latency,
+        }
+        ws_url = f"{base_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
 
         start = time.perf_counter()
         chunk_index = 0
@@ -104,10 +114,11 @@ class ElevenLabsTTSClient:
 
         async with self._semaphore:
             try:
+                log.info("elevenlabs_ws_connecting", voice_id=language.voice_id, format=self._cfg.output_format)
                 async with session.ws_connect(
                     ws_url,
                     headers={"xi-api-key": self._cfg.api_key},
-                    heartbeat=20,
+                    heartbeat=cfg.server.ping_interval_seconds,
                     max_msg_size=0,
                 ) as ws:
                     # Send BOS (beginning of stream) message
@@ -148,6 +159,16 @@ class ElevenLabsTTSClient:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = json.loads(msg.data)
 
+                            if "error" in data:
+                                provider_error = str(data["error"])
+                                log.error("elevenlabs_ws_error", error=provider_error, lang=language.code)
+                                if provider_error == "payment_required":
+                                    raise TTSProviderError(
+                                        "ElevenLabs payment required for TTS generation",
+                                        retryable=False,
+                                    )
+                                raise TTSProviderError(f"ElevenLabs error: {provider_error}")
+
                             if "audio" in data and data["audio"]:
                                 import base64
                                 audio_bytes = base64.b64decode(data["audio"])
@@ -178,7 +199,16 @@ class ElevenLabsTTSClient:
                                 break
 
                         elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            if msg.type == aiohttp.WSMsgType.CLOSED and msg.data == 1008:
+                                raise TTSProviderError(
+                                    "ElevenLabs websocket rejected the request (1008)",
+                                    retryable=False,
+                                )
+                            log.warning("elevenlabs_ws_closed_unexpectedly", type=msg.type, data=msg.data, lang=language.code)
                             break
+                    
+                    if chunk_index == 0:
+                        log.warning("elevenlabs_no_audio_received", lang=language.code)
 
                     # Ensure tx_task completes and propagate any errors
                     try:
@@ -205,6 +235,8 @@ class ElevenLabsTTSClient:
                 )
 
             except Exception as exc:
+                if isinstance(exc, TTSProviderError) and not exc.retryable:
+                    raise
                 log.warning(
                     "tts_ws_error",
                     lang=language.code,
@@ -256,6 +288,11 @@ class ElevenLabsTTSClient:
         async with self._semaphore:
             try:
                 async with session.post(url, json=payload) as resp:
+                    if resp.status == 402:
+                        raise TTSProviderError(
+                            "ElevenLabs payment required for TTS generation",
+                            retryable=False,
+                        )
                     resp.raise_for_status()
                     async for audio_bytes in resp.content.iter_chunked(
                         self._cfg.stream_chunk_size
@@ -283,6 +320,7 @@ class ElevenLabsTTSClient:
 
             except Exception as exc:
                 log.error("tts_http_error", lang=language.code, error=str(exc))
+                raise
 
         # Final marker
         yield TTSChunk(
